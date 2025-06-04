@@ -22,7 +22,7 @@ public class AccountsController : ControllerBase
         _tokenService = tokenService;
     }
 
-    [HttpPost("api/accounts")]
+    [HttpPost("api/accounts/signup")]
     public async Task<IActionResult> Signup([FromBody] SignupRequestDto request)
     {
         try
@@ -155,5 +155,81 @@ public class AccountsController : ControllerBase
             errorResponse.AddError("Exception", e.Message);
             return BadRequest(errorResponse);
         }
+    }
+
+    [HttpPost("api/accounts/login")]
+    public async Task<IActionResult> Login([FromBody] LoginRequestDto request)
+    {
+        if (
+            string.IsNullOrEmpty(request.Email) ||
+            !(new EmailAddressAttribute().IsValid(request.Email)) ||
+            (await _userManager.FindByEmailAsync(request.Email) is var user && user == null)
+        )
+        {
+            return BadRequest(ApiResponse<AuthResponseDto>.ErrorResponse(
+                message: "Login failed. Please check your input.",
+                statusCode: 400,
+                errorCode: "INVALID_EMAIL",
+                details: "The provided email is either invalid in format or not registered.",
+                errors: new Dictionary<string, List<string>>
+                {
+                    { "Email", new List<string> { "The email address is invalid or does not exist." } }
+                }
+            ));
+        }
+
+        if (string.IsNullOrEmpty(request.Password))
+        {
+            return BadRequest(
+                ApiResponse<AuthResponseDto>.ErrorResponse(
+                    message: "Login failed. Please check your input.",
+                    statusCode: 400,
+                    errorCode: "EMPTY_PASSWORD",
+                    details: "The password field cannot be empty.",
+                    errors: new Dictionary<string, List<string>>
+                    {
+                        { "Password", new List<string> { "Password is required." } }
+                    }
+                )
+            );
+        }
+
+        var isValidPassword = await _userManager.CheckPasswordAsync(user, request.Password);
+
+        if (!isValidPassword)
+        {
+            return Unauthorized(
+                    ApiResponse<AuthResponseDto>.ErrorResponse(
+                        message: "Login failed. Invalid email or password.",
+                        statusCode: 401, // Unauthorized
+                        errorCode: "INVALID_CREDENTIALS",
+                        details: "The provided credentials are incorrect. Please try again.",
+                        errors: new Dictionary<string, List<string>>
+                        {
+                            { "Email", new List<string> { "Invalid email or password." } },
+                            { "Password", new List<string> { "Invalid email or password." } }
+                        }
+                    )
+                );
+        }
+
+        var tokenResult = _tokenService.GenerateJwtToken(user);
+        return Ok(ApiResponse<AuthResponseDto>.SuccessResponse(
+            new AuthResponseDto
+            {
+                Token = tokenResult.Token,
+                ExpiresAt = tokenResult.ExpiresAt,
+                User = new UserDto
+                {
+                    DisplayName = user.DisplayName ?? "Anonymous",
+                    Email = user.Email ?? "anonymous@gmail.com",
+                    IsOnline = user.IsOnline,
+                    Id = user.Id,
+                    LastSeen = user.LastSeen,
+                    Theme = user.Theme ?? "system",
+                    UserName = user.UserName ?? "anonymous",
+                }
+            }
+        ));
     }
 }
