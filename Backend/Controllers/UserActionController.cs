@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using Chatly.Data;
 using Chatly.DTO;
 using Chatly.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -21,7 +22,7 @@ public class UserActionController : ControllerBase
     }
 
     [HttpGet("api/users/")]
-    public async Task<IActionResult> QueryUser(UserSearchRequestDto request)
+    public async Task<IActionResult> QueryUser([FromQuery] UserSearchRequestDto request)
     {
         try
         {
@@ -60,13 +61,26 @@ public class UserActionController : ControllerBase
                     Id = u.Id,
                     UserName = u.UserName ?? "N/A",
                 }).ToListAsync();
-            var totalCount = await _userManager.Users.CountAsync();
+
+            var count = await _userManager.Users
+                .Where(u =>
+                    EF.Functions.Like(u.NormalizedUserName, $"%{query}%") ||
+                    EF.Functions.Like(u.NormalizedUserName, $"{query}%") ||
+                    EF.Functions.Like(u.NormalizedUserName, $"%{query}") ||
+                    u.NormalizedUserName == query
+                ).Skip((request.Page - 1) * request.PageSize).Take(request.PageSize).Select(u => new UserDto
+                {
+                    DisplayName = u.DisplayName ?? "N/A",
+                    Email = u.Email ?? "N/A",
+                    Id = u.Id,
+                    UserName = u.UserName ?? "N/A",
+                }).CountAsync();
 
             return Ok(
                 ApiResponse<List<UserDto>>.SuccessResponse(
                     users,
                     "Some users have been found",
-                    totalCount,
+                    count,
                     200
                 ));
         }
@@ -83,6 +97,44 @@ public class UserActionController : ControllerBase
                     { "Server", new List<string> { "Something went wrong" } }
                 }
             ));
+        }
+    }
+
+    [Authorize]
+    [HttpPost("api/users/")]
+    public async Task<IActionResult> AddToContacts([FromBody] ContactActionDto request)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(request.ContactUserId) ||
+                (await _userManager.FindByNameAsync(request.ContactUserId) is var user && user == null))
+            {
+                return BadRequest(ApiResponse<object>.ErrorResponse(
+                    "Could not find user",
+                    404,
+                    "USER_ID_NOTFOUND",
+                    "User id is null or does not exist.",
+                    new Dictionary<string, List<string>>
+                    {
+                        {
+                            "ContactUserId", new List<string> { "User with id not found or user id is null" }
+                        }
+                    }
+                ));
+            }
+
+            var newContact = new Contact
+            {
+                Id = Guid.NewGuid().ToString(),
+                ContactId = user.Id,
+                
+            };
+
+            throw new Exception("An exception occured");
+        }
+        catch (Exception e)
+        {
+            throw new Exception("An exception occured");
         }
     }
 }
