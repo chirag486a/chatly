@@ -15,7 +15,7 @@ public class UserSearchRequestDto
 // ----------------------------
 public class ContactActionDto
 {
-    public string ContactUserId { get; set; }
+    public string ContactUserId { get; set; } = string.Empty;
 }
 
 public class ContactActionResponseDto

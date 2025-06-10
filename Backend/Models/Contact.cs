@@ -3,13 +3,21 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Chatly.Models;
 
+public enum ContactStatus
+{
+    Pending,
+    Accepted,
+    Blocked,
+    Deleted
+}
+
 [PrimaryKey(nameof(Id))]
 public class Contact
 {
     public string? Id { get; set; }
     public string? UserId { get; set; }
     public string? ContactId { get; set; }
-    public string? Status { get; set; }
+    public ContactStatus? Status { get; set; } = ContactStatus.Pending;
     public DateTime? CreatedAt { get; set; }
     public bool ChatDeleted { get; set; }
     public bool Mutated { get; set; }

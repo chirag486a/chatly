@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
 using Chatly.Data;
 using Chatly.DTO;
+using Chatly.Extensions;
 using Chatly.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
@@ -10,6 +11,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Chatly.Controllers;
 
 [ApiController]
+[Route("api/users")]
 public class UserActionController : ControllerBase
 {
     UserManager<User> _userManager;
@@ -21,7 +23,14 @@ public class UserActionController : ControllerBase
         _dbContext = dbContext;
     }
 
-    [HttpGet("api/users/")]
+    [HttpGet("authtest")]
+    [Authorize]
+    public IActionResult secureTest()
+    {
+        return Ok("Hello");
+    }
+
+    [HttpGet]
     public async Task<IActionResult> QueryUser([FromQuery] UserSearchRequestDto request)
     {
         try
@@ -101,7 +110,7 @@ public class UserActionController : ControllerBase
     }
 
     [Authorize]
-    [HttpPost("api/users/")]
+    [HttpPost("contacts")]
     public async Task<IActionResult> AddToContacts([FromBody] ContactActionDto request)
     {
         try
@@ -123,18 +132,55 @@ public class UserActionController : ControllerBase
                 ));
             }
 
+            var currUserId = User.GetUserId();
+            if (currUserId == null)
+                throw new Exception("User id is null or does not exist.");
+
+            var currUser = await _userManager.FindByIdAsync(currUserId);
+
+            if (currUser == null)
+                throw new Exception("User does not exist.");
+
             var newContact = new Contact
             {
-                Id = Guid.NewGuid().ToString(),
                 ContactId = user.Id,
-                
+                UserId = User.GetUserId(),
+                Status = ContactStatus.Pending,
+                CreatedAt = DateTime.Now,
+                ChatDeleted = false,
+                Mutated = false,
+                Archived = false,
+                UnreadCount = 0,
             };
 
-            throw new Exception("An exception occured");
+            var contact = _dbContext.Contacts.Add(newContact);
+            if (!(await _dbContext.SaveChangesAsync() > 0))
+            {
+                throw new Exception("Failed to add contact");
+            }
+
+            return CreatedAtAction(nameof(GetContacts),
+                ApiResponse<Contact>.SuccessResponse(newContact, "Added contact", null, 201));
         }
         catch (Exception e)
         {
-            throw new Exception("An exception occured");
+            Console.WriteLine("fkljsdfl;kajsdfl;sdkjf;lsdfjl;");
+            return BadRequest(ApiResponse<object>.ErrorResponse(
+                e.Message,
+                500,
+                "SERVER_ERROR",
+                "Something went wrong in the server",
+                new Dictionary<string, List<string>>
+                    { { "Sever", new List<string> { "Something went wrong in the server" } } }
+            ));
         }
+    }
+
+    [Authorize]
+    [HttpGet("contacts")]
+    public Task<IActionResult> GetContacts([FromQuery] UserSearchRequestDto request)
+    {
+        
+        throw new NotImplementedException();
     }
 }

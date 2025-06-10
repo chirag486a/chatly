@@ -42,8 +42,8 @@ public class TokenService : ITokenService
 
             var claims = new[]
             {
-                new Claim(ClaimTypes.Name, user.UserName),
-                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+                new Claim(ClaimTypes.NameIdentifier, user.Id),
+                new Claim(JwtRegisteredClaimNames.Name, user.UserName),
             };
 
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(passwordKey));
@@ -55,7 +55,8 @@ public class TokenService : ITokenService
                 issuer: _config["Jwt:Issuer"],
                 claims: claims,
                 expires: expiresAt,
-                signingCredentials: creds);
+                signingCredentials: creds,
+                audience: _config["Jwt:Audience"]);
 
             return new TokenResult
             {
@@ -63,7 +64,7 @@ public class TokenService : ITokenService
                 ExpiresAt = expiresAt
             };
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             throw;
         }

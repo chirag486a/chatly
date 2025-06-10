@@ -9,4 +9,11 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<Contact> Contacts { get; set; }
     public DbSet<Message> Messages { get; set; }
     public DbSet<ForwardedMessage> ForwardedMessages { get; set; }
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Contact>()
+            .Property(c => c.Status)
+            .HasConversion<string>();
+    }
 }
