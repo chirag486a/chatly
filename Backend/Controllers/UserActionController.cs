@@ -3,6 +3,7 @@ using Chatly.Data;
 using Chatly.DTO;
 using Chatly.Extensions;
 using Chatly.Models;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -21,13 +22,6 @@ public class UserActionController : ControllerBase
     {
         _userManager = userManager;
         _dbContext = dbContext;
-    }
-
-    [HttpGet("authtest")]
-    [Authorize]
-    public IActionResult secureTest()
-    {
-        return Ok("Hello");
     }
 
     [HttpGet]
@@ -115,8 +109,24 @@ public class UserActionController : ControllerBase
     {
         try
         {
+            if (!string.IsNullOrEmpty(request.ContactUserId) && request.ContactUserId == User.GetUserId())
+            {
+                return Conflict(ApiResponse<object>.ErrorResponse(
+                    "Contact user already exits",
+                    409,
+                    "DUPLICATE_USER",
+                    "The contact already exits with this id.",
+                    new Dictionary<string, List<string>>
+                    {
+                        {
+                            "ContactUserId", new List<string> { "Contact already exits." }
+                        }
+                    }
+                ));
+            }
+
             if (string.IsNullOrEmpty(request.ContactUserId) ||
-                (await _userManager.FindByNameAsync(request.ContactUserId) is var user && user == null))
+                (await _userManager.FindByIdAsync(request.ContactUserId) is var user && user == null))
             {
                 return BadRequest(ApiResponse<object>.ErrorResponse(
                     "Could not find user",
@@ -135,6 +145,15 @@ public class UserActionController : ControllerBase
             var currUserId = User.GetUserId();
             if (currUserId == null)
                 throw new Exception("User id is null or does not exist.");
+            if (request.ContactUserId == currUserId)
+                return BadRequest(
+                    ApiResponse<object>.ErrorResponse("Can't add to contact with same person",
+                        404,
+                        "INVALID_INPUT",
+                        "Your user id is same as the contact user id and they can't be same",
+                        new Dictionary<string, List<string>>
+                            { { "ContactUserId", new List<string> { "Can't be same as your id" } } })
+                );
 
             var currUser = await _userManager.FindByIdAsync(currUserId);
 
@@ -143,6 +162,7 @@ public class UserActionController : ControllerBase
 
             var newContact = new Contact
             {
+                Id = Guid.NewGuid().ToString(),
                 ContactId = user.Id,
                 UserId = User.GetUserId(),
                 Status = ContactStatus.Pending,
@@ -160,11 +180,21 @@ public class UserActionController : ControllerBase
             }
 
             return CreatedAtAction(nameof(GetContacts),
-                ApiResponse<Contact>.SuccessResponse(newContact, "Added contact", null, 201));
+                ApiResponse<ContactActionResponseDto>.SuccessResponse(new ContactActionResponseDto
+                {
+                    Id = newContact.Id,
+                    ContactId = newContact.ContactId,
+                    UserId = newContact.UserId,
+                    Status = newContact.Status,
+                    CreatedAt = newContact.CreatedAt,
+                    ChatDeleted = newContact.ChatDeleted,
+                    Mutated = newContact.Mutated,
+                    Archived = newContact.Archived,
+                    UnreadCount = newContact.UnreadCount,
+                }, "Added contact", null, 201));
         }
         catch (Exception e)
         {
-            Console.WriteLine("fkljsdfl;kajsdfl;sdkjf;lsdfjl;");
             return BadRequest(ApiResponse<object>.ErrorResponse(
                 e.Message,
                 500,
@@ -180,7 +210,6 @@ public class UserActionController : ControllerBase
     [HttpGet("contacts")]
     public Task<IActionResult> GetContacts([FromQuery] UserSearchRequestDto request)
     {
-        
         throw new NotImplementedException();
     }
 }

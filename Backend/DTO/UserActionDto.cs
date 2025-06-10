@@ -1,3 +1,5 @@
+using Chatly.Models;
+
 namespace Chatly.DTO;
 
 // ----------------------------
@@ -20,7 +22,15 @@ public class ContactActionDto
 
 public class ContactActionResponseDto
 {
-    public string Status { get; set; } = "Success";
+    public string Id { get; set; } = "";
+    public string ContactId { get; set; } = "";
+    public string UserId { get; set; } = "";
+    public ContactStatus? Status = ContactStatus.Pending;
+    public DateTime? CreatedAt = DateTime.Now;
+    public bool ChatDeleted { get; set; } = false;
+    public bool Mutated { get; set; } = false;
+    public bool Archived { get; set; } = false;
+    public int UnreadCount { get; set; } = 0;
 }
 
 // ----------------------------
