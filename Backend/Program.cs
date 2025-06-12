@@ -1,11 +1,14 @@
 using System.Text;
 using Chatly.Data;
 using Chatly.DTO;
+using Chatly.Interfaces.Repositories;
 using Chatly.Interfaces.Services;
 using Chatly.Models;
+using Chatly.Repositories;
 using Chatly.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc.ApiExplorer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
@@ -65,9 +68,27 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 
 builder.Services.AddScoped<IPasswordFormatValidator, PasswordFormatValidator>();
 builder.Services.AddScoped<ITokenService, TokenService>();
+builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<IContactRepository, ContactRepository>();
 
 
 var app = builder.Build();
+
+
+// Get all endpoints
+var apiDescriptionProvider = app.Services.GetRequiredService<IApiDescriptionGroupCollectionProvider>();
+var apiDescriptions = apiDescriptionProvider.ApiDescriptionGroups.Items;
+
+foreach (var group in apiDescriptions)
+{
+    foreach (var apiDescription in group.Items)
+    {
+        Console.WriteLine($"Path: {apiDescription.RelativePath}");
+        Console.WriteLine($"Method: {apiDescription.HttpMethod}");
+        Console.WriteLine($"Parameters: {string.Join(", ", apiDescription.ParameterDescriptions.Select(p => p.Name))}");
+        Console.WriteLine("---");
+    }
+}
 
 app.UseAuthentication();
 app.UseAuthorization();

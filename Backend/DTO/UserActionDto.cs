@@ -5,22 +5,28 @@ namespace Chatly.DTO;
 // ----------------------------
 // 🔍 4: User Search DTOs
 // ----------------------------
-public class UserSearchRequestDto
+public class SearchUsersRequestDto
 {
     public string Query { get; set; } = string.Empty;
     public int Page { get; set; } = 1;
     public int PageSize { get; set; } = 5;
 }
 
+public class SearchUsersResponseDto
+{
+    public List<UserDto>? Users { get; set; }
+    public int total { get; set; } = 0;
+}
+
 // ----------------------------
 // 👤 5 & 6: Contact Deletion / Blocking
 // ----------------------------
-public class ContactActionDto
+public class CreateContactRequestDto
 {
     public string ContactUserId { get; set; } = string.Empty;
 }
 
-public class ContactActionResponseDto
+public class CreateContactResponseDto
 {
     public string Id { get; set; } = "";
     public string ContactId { get; set; } = "";

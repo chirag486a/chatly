@@ -1,111 +1,27 @@
-using System.Text.RegularExpressions;
 using Chatly.Data;
 using Chatly.DTO;
 using Chatly.Extensions;
 using Chatly.Models;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace Chatly.Controllers;
 
 [ApiController]
-[Route("api/users")]
-public class UserActionController : ControllerBase
+[Route("api/[controller]")]
+public class ContactsController : ControllerBase
 {
-    UserManager<User> _userManager;
-    ApplicationDbContext _dbContext;
+    private UserManager<User> _userManager;
+    private ApplicationDbContext _dbContext;
 
-    public UserActionController(ApplicationDbContext dbContext, UserManager<User> userManager)
+    public ContactsController(UserManager<User> userManager, ApplicationDbContext dbContext)
     {
         _userManager = userManager;
         _dbContext = dbContext;
     }
 
-    [HttpGet]
-    public async Task<IActionResult> QueryUser([FromQuery] UserSearchRequestDto request)
-    {
-        try
-        {
-            if (string.IsNullOrEmpty(request.Query))
-            {
-                return BadRequest(ApiResponse<object>.ErrorResponse(
-                    "No query parameter",
-                    400,
-                    "REQ_NULL_QUERY",
-                    "The query field in the request is required but was null.",
-                    new Dictionary<string, List<string>>
-                    {
-                        { "Query", new List<string> { "Query parameter is required." } }
-                    }
-                ));
-            }
-
-            if (request.Page < 0 || request.PageSize < 0)
-            {
-                request.Page = 0;
-                request.PageSize = 5;
-            }
-
-            var query = request.Query.ToUpper();
-
-            var users = await _userManager.Users
-                .Where(u =>
-                    EF.Functions.Like(u.NormalizedUserName, $"%{query}%") ||
-                    EF.Functions.Like(u.NormalizedUserName, $"{query}%") ||
-                    EF.Functions.Like(u.NormalizedUserName, $"%{query}") ||
-                    u.NormalizedUserName == query
-                ).Skip((request.Page - 1) * request.PageSize).Take(request.PageSize).Select(u => new UserDto
-                {
-                    DisplayName = u.DisplayName ?? "N/A",
-                    Email = u.Email ?? "N/A",
-                    Id = u.Id,
-                    UserName = u.UserName ?? "N/A",
-                }).ToListAsync();
-
-            var count = await _userManager.Users
-                .Where(u =>
-                    EF.Functions.Like(u.NormalizedUserName, $"%{query}%") ||
-                    EF.Functions.Like(u.NormalizedUserName, $"{query}%") ||
-                    EF.Functions.Like(u.NormalizedUserName, $"%{query}") ||
-                    u.NormalizedUserName == query
-                ).Skip((request.Page - 1) * request.PageSize).Take(request.PageSize).Select(u => new UserDto
-                {
-                    DisplayName = u.DisplayName ?? "N/A",
-                    Email = u.Email ?? "N/A",
-                    Id = u.Id,
-                    UserName = u.UserName ?? "N/A",
-                }).CountAsync();
-
-            return Ok(
-                ApiResponse<List<UserDto>>.SuccessResponse(
-                    users,
-                    "Some users have been found",
-                    count,
-                    200
-                ));
-        }
-        catch (Exception e)
-        {
-            Console.WriteLine(e);
-            return BadRequest(ApiResponse<object>.ErrorResponse(
-                "Something went wrong",
-                500,
-                "SERVER_ERROR",
-                "Something went wrong while processing your request.",
-                new Dictionary<string, List<string>>
-                {
-                    { "Server", new List<string> { "Something went wrong" } }
-                }
-            ));
-        }
-    }
-
-    [Authorize]
-    [HttpPost("contacts")]
-    public async Task<IActionResult> AddToContacts([FromBody] ContactActionDto request)
+    [HttpPost]
+    public async Task<IActionResult> Create(CreateContactRequestDto request)
     {
         try
         {
@@ -179,8 +95,8 @@ public class UserActionController : ControllerBase
                 throw new Exception("Failed to add contact");
             }
 
-            return CreatedAtAction(nameof(GetContacts),
-                ApiResponse<ContactActionResponseDto>.SuccessResponse(new ContactActionResponseDto
+            return CreatedAtAction(nameof(GetContact),
+                ApiResponse<CreateContactResponseDto>.SuccessResponse(new CreateContactResponseDto()
                 {
                     Id = newContact.Id,
                     ContactId = newContact.ContactId,
@@ -206,9 +122,14 @@ public class UserActionController : ControllerBase
         }
     }
 
-    [Authorize]
-    [HttpGet("contacts")]
-    public Task<IActionResult> GetContacts([FromQuery] UserSearchRequestDto request)
+    [HttpGet]
+    public async Task<IActionResult> GetContacts()
+    {
+        throw new NotImplementedException();
+    }
+
+    [HttpGet("{userId}")]
+    public async Task<IActionResult> GetContact([FromRoute] string userId)
     {
         throw new NotImplementedException();
     }

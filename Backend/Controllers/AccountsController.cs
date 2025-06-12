@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Chatly.Controllers;
 
 [ApiController]
+[Route("[controller]")]
 public class AccountsController : ControllerBase
 {
     private readonly UserManager<User> _userManager;
@@ -22,7 +23,7 @@ public class AccountsController : ControllerBase
         _tokenService = tokenService;
     }
 
-    [HttpPost("api/accounts/signup")]
+    [HttpPost("[action]")]
     public async Task<IActionResult> Signup([FromBody] SignupRequestDto request)
     {
         try
@@ -157,7 +158,7 @@ public class AccountsController : ControllerBase
         }
     }
 
-    [HttpPost("api/accounts/login")]
+    [HttpPost("[action]")]
     public async Task<IActionResult> Login([FromBody] LoginRequestDto request)
     {
         if (
@@ -199,18 +200,18 @@ public class AccountsController : ControllerBase
         if (!isValidPassword)
         {
             return Unauthorized(
-                    ApiResponse<AuthResponseDto>.ErrorResponse(
-                        message: "Login failed. Invalid email or password.",
-                        statusCode: 401, // Unauthorized
-                        errorCode: "INVALID_CREDENTIALS",
-                        details: "The provided credentials are incorrect. Please try again.",
-                        errors: new Dictionary<string, List<string>>
-                        {
-                            { "Email", new List<string> { "Invalid email or password." } },
-                            { "Password", new List<string> { "Invalid email or password." } }
-                        }
-                    )
-                );
+                ApiResponse<AuthResponseDto>.ErrorResponse(
+                    message: "Login failed. Invalid email or password.",
+                    statusCode: 401, // Unauthorized
+                    errorCode: "INVALID_CREDENTIALS",
+                    details: "The provided credentials are incorrect. Please try again.",
+                    errors: new Dictionary<string, List<string>>
+                    {
+                        { "Email", new List<string> { "Invalid email or password." } },
+                        { "Password", new List<string> { "Invalid email or password." } }
+                    }
+                )
+            );
         }
 
         var tokenResult = _tokenService.GenerateJwtToken(user);
