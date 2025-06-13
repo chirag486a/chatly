@@ -23,6 +23,7 @@ public class UsersController : ControllerBase
         _userRepository = userRepository;
     }
 
+    [Authorize]
     [HttpGet("[action]")]
     public async Task<IActionResult> Search([FromQuery] SearchUsersRequestDto request)
     {

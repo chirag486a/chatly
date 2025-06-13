@@ -29,7 +29,6 @@ public class UserRepository : IUserRepository
             }
 
             var query = request.Query.ToUpper();
-            Console.WriteLine(query);
 
             var users = await _userManager.Users.AsQueryable()
                 .Where(u =>
