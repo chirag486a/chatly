@@ -15,7 +15,7 @@ public class ApiResponse<T>
         T? data = default,
         string? message = null,
         int? totalCount = null,
-        int? statusCode = 200
+        int? statusCode = StatusCodes.Status202Accepted
     )
     {
         return new ApiResponse<T>
@@ -30,7 +30,7 @@ public class ApiResponse<T>
 
     public static ApiResponse<T> ErrorResponse(
         string? message = null,
-        int? statusCode = 400,
+        int? statusCode = StatusCodes.Status500InternalServerError,
         string? errorCode = null,
         string? details = null,
         Dictionary<string, List<string>>? errors = null
@@ -65,11 +65,13 @@ public class ApiResponse<T>
         this.StatusCode = statusCode;
         return this;
     }
+
     public ApiResponse<T> SetErrorCode(string errorCode)
     {
         this.ErrorCode = errorCode;
         return this;
     }
+
     public ApiResponse<T> SetErrorDetails(string errorDetails)
     {
         this.ErrorCode = errorDetails;

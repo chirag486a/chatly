@@ -1,9 +1,14 @@
+using System.Net;
+using System.Runtime.CompilerServices;
 using Chatly.Data;
 using Chatly.DTO;
+using Chatly.Exceptions;
 using Chatly.Extensions;
+using Chatly.Interfaces.Repositories;
 using Chatly.Models;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using ApplicationException = Chatly.Exceptions.ApplicationException;
 
 namespace Chatly.Controllers;
 
@@ -11,126 +16,80 @@ namespace Chatly.Controllers;
 [Route("api/[controller]")]
 public class ContactsController : ControllerBase
 {
-    private UserManager<User> _userManager;
-    private ApplicationDbContext _dbContext;
+    private readonly IContactRepository _contactRepository;
 
-    public ContactsController(UserManager<User> userManager, ApplicationDbContext dbContext)
+    public ContactsController(IContactRepository contactRepository)
     {
-        _userManager = userManager;
-        _dbContext = dbContext;
+        _contactRepository = contactRepository;
     }
 
     [HttpPost]
-    public async Task<IActionResult> Create(CreateContactRequestDto request)
+    public async Task<IActionResult> SendRequest(SendRequestRequestDto request)
     {
         try
         {
-            if (!string.IsNullOrEmpty(request.ContactUserId) && request.ContactUserId == User.GetUserId())
+            if (User.GetUserId() == null)
             {
-                return Conflict(ApiResponse<object>.ErrorResponse(
-                    "Contact user already exits",
-                    409,
-                    "DUPLICATE_USER",
-                    "The contact already exits with this id.",
-                    new Dictionary<string, List<string>>
-                    {
-                        {
-                            "ContactUserId", new List<string> { "Contact already exits." }
-                        }
-                    }
-                ));
+                throw new ApplicationUnauthorizedAccessException("User not logged in", "The user id is null").AddError(
+                    "UserId", "User id is null");
             }
 
-            if (string.IsNullOrEmpty(request.ContactUserId) ||
-                (await _userManager.FindByIdAsync(request.ContactUserId) is var user && user == null))
-            {
-                return BadRequest(ApiResponse<object>.ErrorResponse(
-                    "Could not find user",
-                    404,
-                    "USER_ID_NOTFOUND",
-                    "User id is null or does not exist.",
-                    new Dictionary<string, List<string>>
-                    {
-                        {
-                            "ContactUserId", new List<string> { "User with id not found or user id is null" }
-                        }
-                    }
-                ));
-            }
 
-            var currUserId = User.GetUserId();
-            if (currUserId == null)
-                throw new Exception("User id is null or does not exist.");
-            if (request.ContactUserId == currUserId)
-                return BadRequest(
-                    ApiResponse<object>.ErrorResponse("Can't add to contact with same person",
-                        404,
-                        "INVALID_INPUT",
-                        "Your user id is same as the contact user id and they can't be same",
-                        new Dictionary<string, List<string>>
-                            { { "ContactUserId", new List<string> { "Can't be same as your id" } } })
-                );
-
-            var currUser = await _userManager.FindByIdAsync(currUserId);
-
-            if (currUser == null)
-                throw new Exception("User does not exist.");
-
-            var newContact = new Contact
-            {
-                Id = Guid.NewGuid().ToString(),
-                ContactId = user.Id,
-                UserId = User.GetUserId(),
-                Status = ContactStatus.Pending,
-                CreatedAt = DateTime.Now,
-                ChatDeleted = false,
-                Mutated = false,
-                Archived = false,
-                UnreadCount = 0,
-            };
-
-            var contact = _dbContext.Contacts.Add(newContact);
-            if (!(await _dbContext.SaveChangesAsync() > 0))
-            {
-                throw new Exception("Failed to add contact");
-            }
-
+            var newContact = await _contactRepository.Create(request, User.GetUserId());
             return CreatedAtAction(nameof(GetContact),
-                ApiResponse<CreateContactResponseDto>.SuccessResponse(new CreateContactResponseDto()
-                {
-                    Id = newContact.Id,
-                    ContactId = newContact.ContactId,
-                    UserId = newContact.UserId,
-                    Status = newContact.Status,
-                    CreatedAt = newContact.CreatedAt,
-                    ChatDeleted = newContact.ChatDeleted,
-                    Mutated = newContact.Mutated,
-                    Archived = newContact.Archived,
-                    UnreadCount = newContact.UnreadCount,
-                }, "Added contact", null, 201));
+                new { userId = newContact.Id }, // This is the routeValues object
+                ApiResponse<CreateContactResponseDto>.SuccessResponse(newContact, "Added contact", null,
+                    StatusCodes.Status201Created));
+        }
+        catch (ApplicationUnauthorizedAccessException e)
+        {
+            return Unauthorized(
+                ApiResponse<object>.ErrorResponse(e.Message, e.StatusCode, e.ErrorCode, e.Details, e.Errors));
+        }
+        catch (ApplicationArgumentException e)
+        {
+            return this.InternalServerError(
+                ApiResponse<object>.ErrorResponse(e.Message, e.StatusCode, e.ErrorCode, e.Details, e.Errors));
+        }
+        catch (NotFoundException e)
+        {
+            return NotFound(
+                ApiResponse<object>.ErrorResponse(e.Message, e.StatusCode, e.ErrorCode, e.Details, e.Errors));
+        }
+        catch (ApplicationException e)
+        {
+            return this.InternalServerError(
+                ApiResponse<object>.ErrorResponse(e.Message, e.StatusCode, e.ErrorCode, e.Details, e.Errors));
         }
         catch (Exception e)
         {
-            return BadRequest(ApiResponse<object>.ErrorResponse(
-                e.Message,
-                500,
-                "SERVER_ERROR",
-                "Something went wrong in the server",
-                new Dictionary<string, List<string>>
-                    { { "Sever", new List<string> { "Something went wrong in the server" } } }
-            ));
+            return this.InternalServerError(ApiResponse<object>.ErrorResponse("Something went wrong"));
         }
     }
 
     [HttpGet]
     public async Task<IActionResult> GetContacts()
     {
-        throw new NotImplementedException();
+        return Ok();
     }
 
     [HttpGet("{userId}")]
     public async Task<IActionResult> GetContact([FromRoute] string userId)
     {
-        throw new NotImplementedException();
+        try
+        {
+            var contact = await _contactRepository.Get(userId);
+            return Ok(ApiResponse<Contact>.SuccessResponse(contact, "Contact found", null, StatusCodes.Status200OK));
+        }
+        catch (NotFoundException e)
+        {
+            return NotFound(
+                ApiResponse<object>.ErrorResponse(e.Message, e.StatusCode, e.ErrorCode, e.Details, e.Errors));
+        }
+        catch (ApplicationException e)
+        {
+            return this.InternalServerError(
+                ApiResponse<object>.ErrorResponse(e.Message, e.StatusCode, e.ErrorCode, e.Details, e.Errors));
+        }
     }
 }
