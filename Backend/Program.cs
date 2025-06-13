@@ -1,11 +1,14 @@
 using System.Text;
 using Chatly.Data;
 using Chatly.DTO;
+using Chatly.Interfaces.Repositories;
 using Chatly.Interfaces.Services;
 using Chatly.Models;
+using Chatly.Repositories;
 using Chatly.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc.ApiExplorer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
@@ -29,14 +32,15 @@ if (string.IsNullOrEmpty(jwtIssuer) && string.IsNullOrEmpty(jwtAudience))
     throw new Exception("Jwt configuration settings is missing or invalid.");
 }
 
+builder.Services.AddIdentity<User, IdentityRole>()
+    .AddEntityFrameworkStores<ApplicationDbContext>()
+    .AddDefaultTokenProviders();
+
+
 builder.Services.AddAuthentication(options =>
     {
-        options.DefaultAuthenticateScheme =
-            options.DefaultChallengeScheme =
-                options.DefaultForbidScheme =
-                    options.DefaultScheme =
-                        options.DefaultSignInScheme =
-                            options.DefaultSignOutScheme = JwtBearerDefaults.AuthenticationScheme;
+        options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+        options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
     })
     .AddJwtBearer(options =>
     {
@@ -64,31 +68,26 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 
 builder.Services.AddScoped<IPasswordFormatValidator, PasswordFormatValidator>();
 builder.Services.AddScoped<ITokenService, TokenService>();
-
-builder.Services.AddIdentity<User, IdentityRole>()
-    .AddEntityFrameworkStores<ApplicationDbContext>()
-    .AddDefaultTokenProviders();
-
-builder.Services.ConfigureApplicationCookie(options =>
-{
-    options.Events.OnRedirectToLogin = context =>
-    {
-        context.Response.StatusCode = 401;
-        return Task.CompletedTask;
-    };
-    options.Events.OnRedirectToAccessDenied = context =>
-    {
-        context.Response.StatusCode = 403;
-        return Task.CompletedTask;
-    };
-});
+builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<IContactRepository, ContactRepository>();
 
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
+
+// Get all endpoints
+var apiDescriptionProvider = app.Services.GetRequiredService<IApiDescriptionGroupCollectionProvider>();
+var apiDescriptions = apiDescriptionProvider.ApiDescriptionGroups.Items;
+
+foreach (var group in apiDescriptions)
 {
-    Console.WriteLine("Development Mode");
+    foreach (var apiDescription in group.Items)
+    {
+        Console.WriteLine($"Path: {apiDescription.RelativePath}");
+        Console.WriteLine($"Method: {apiDescription.HttpMethod}");
+        Console.WriteLine($"Parameters: {string.Join(", ", apiDescription.ParameterDescriptions.Select(p => p.Name))}");
+        Console.WriteLine("---");
+    }
 }
 
 app.UseAuthentication();
