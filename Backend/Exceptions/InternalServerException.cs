@@ -16,5 +16,6 @@ public class InternalServerException : ApplicationException<InternalServerExcept
         Message = message;
         StatusCode = StatusCodes.Status500InternalServerError;
         ErrorCode = "SERVER_ERROR";
+        Details = details;
     }
 }

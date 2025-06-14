@@ -10,5 +10,6 @@ public class SendRequestRequestDto
 
 public class SendRequestResponseDto
 {
+    public string? Id { get; set; }
     public string RequestStatus { get; set; } = "Pending"; // or Accepted/Rejected
 }

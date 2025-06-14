@@ -2,13 +2,14 @@ using System.ComponentModel.DataAnnotations;
 using Chatly.DTO;
 using Chatly.Interfaces.Services;
 using Chatly.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Chatly.Controllers;
 
 [ApiController]
-[Route("[controller]")]
+[Route("api/[controller]")]
 public class AccountsController : ControllerBase
 {
     private readonly UserManager<User> _userManager;
@@ -23,7 +24,8 @@ public class AccountsController : ControllerBase
         _tokenService = tokenService;
     }
 
-    [HttpPost("[action]")]
+    [HttpPost]
+    [AllowAnonymous]
     public async Task<IActionResult> Signup([FromBody] SignupRequestDto request)
     {
         try
