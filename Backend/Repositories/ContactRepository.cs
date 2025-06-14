@@ -18,7 +18,7 @@ public class ContactRepository : IContactRepository
         _dbContext = dbContext;
     }
 
-    public async Task<CreateContactResponseDto> Create(SendRequestRequestDto request, string userId)
+    public async Task<SendRequestResponseDto> Create(SendRequestRequestDto request, string userId)
     {
         try
         {
@@ -72,23 +72,22 @@ public class ContactRepository : IContactRepository
                     "SERVER", "Database error");
             }
 
-            return new CreateContactResponseDto
+            return new SendRequestResponseDto()
             {
                 Id = newContact.Id,
-                ContactId = newContact.ContactId,
-                UserId = newContact.UserId,
-                Status = newContact.Status,
-                CreatedAt = newContact.CreatedAt,
-                ChatDeleted = newContact.ChatDeleted,
-                Mutated = newContact.Mutated,
-                Archived = newContact.Archived,
-                UnreadCount = newContact.UnreadCount,
+                RequestStatus = newContact.Status.ToString(),
             };
         }
         catch (ApplicationException e)
         {
             Console.WriteLine(e.Details);
             throw;
+        }
+        catch (DbUpdateException e)
+        {
+            throw new InternalServerException("Something went wrong while saving contacts",
+                e.Message).AddError(e.Source != null ? e.Source : "DB",
+                e.InnerException != null ? e.InnerException.Message : e.Message);
         }
     }
 

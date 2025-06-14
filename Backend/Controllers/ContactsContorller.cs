@@ -23,6 +23,8 @@ public class ContactsController : ControllerBase
         _contactRepository = contactRepository;
     }
 
+
+    // Creates Contacts    
     [HttpPost]
     public async Task<IActionResult> SendRequest(SendRequestRequestDto request)
     {
@@ -38,7 +40,7 @@ public class ContactsController : ControllerBase
             var newContact = await _contactRepository.Create(request, User.GetUserId());
             return CreatedAtAction(nameof(GetContact),
                 new { userId = newContact.Id }, // This is the routeValues object
-                ApiResponse<CreateContactResponseDto>.SuccessResponse(newContact, "Added contact", null,
+                ApiResponse<SendRequestResponseDto>.SuccessResponse(newContact, "Added contact", null,
                     StatusCodes.Status201Created));
         }
         catch (ApplicationUnauthorizedAccessException e)
