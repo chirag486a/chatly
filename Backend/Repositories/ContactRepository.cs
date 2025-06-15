@@ -52,6 +52,19 @@ public class ContactRepository : IContactRepository
                     .AddError("ContactUserId", "User does not exits");
             }
 
+            var currentContact = await _dbContext.Contacts.FirstOrDefaultAsync(u =>
+                u.Id == request.ContactUserId && u.ContactId == request.ContactUserId);
+
+            if (currentContact != null && currentContact.Status == ContactStatus.Blocked)
+            {
+                string requestedStatus = currentContact.Status.ToString() ?? "Pending";
+                return new SendRequestResponseDto
+                {
+                    Id = currentContact.ContactId,
+                    RequestStatus = requestedStatus,
+                };
+            }
+
 
             var newContact = new Contact
             {
