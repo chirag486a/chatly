@@ -12,4 +12,12 @@ public class ConflictException : ApplicationException<ConflictException>
         StatusCode = DefaultStatusCode;
         ErrorCode = "CONFLICT";
     }
+
+    public ConflictException(string message, string detail) : base(message)
+    {
+        Message = message;
+        StatusCode = DefaultStatusCode;
+        ErrorCode = "CONFLICT";
+        Details = detail;
+    }
 }
