@@ -18,7 +18,7 @@ public class ContactRepository : IContactRepository
         _dbContext = dbContext;
     }
 
-    public async Task<SendRequestResponseDto> Create(SendRequestRequestDto request, string userId)
+    public async Task<CreateContactResponseDto> Create(CreateContactRequestDto request, string userId)
     {
         try
         {
@@ -52,6 +52,17 @@ public class ContactRepository : IContactRepository
                     .AddError("ContactUserId", "User does not exits");
             }
 
+            var currentContact = await _dbContext.Contacts.FirstOrDefaultAsync(u =>
+                (u.ContactId == request.ContactUserId && u.UserId == userId) ||
+                (u.ContactId == userId && u.UserId == request.ContactUserId));
+
+
+            if (currentContact != null)
+            {
+                throw new ConflictException("Unable to add contact", "The contact already exits").AddError("Contact",
+                    "The contact already exits");
+            }
+
 
             var newContact = new Contact
             {
@@ -72,7 +83,7 @@ public class ContactRepository : IContactRepository
                     "SERVER", "Database error");
             }
 
-            return new SendRequestResponseDto()
+            return new CreateContactResponseDto
             {
                 Id = newContact.Id,
                 RequestStatus = newContact.Status.ToString(),

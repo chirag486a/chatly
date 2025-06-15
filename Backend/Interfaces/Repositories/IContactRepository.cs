@@ -5,6 +5,6 @@ namespace Chatly.Interfaces.Repositories;
 
 public interface IContactRepository
 {
-    public Task<SendRequestResponseDto> Create(SendRequestRequestDto contact, string userId);
+    public Task<CreateContactResponseDto> Create(CreateContactRequestDto contact, string userId);
     public Task<Contact> Get(string contactId);
 }
