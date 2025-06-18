@@ -5,9 +5,10 @@ namespace Chatly.Models;
 
 public enum ContactStatus
 {
-    Pending,
-    Accepted,
-    Blocked,
+    None,
+    Pending, // pending
+    Accepted, // accepted
+    Blocked,  // blocked
     Deleted
 }
 
