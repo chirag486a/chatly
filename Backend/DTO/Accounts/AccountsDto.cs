@@ -1,4 +1,4 @@
-namespace Chatly.DTO;
+namespace Chatly.DTO.Accounts;
 
 public class SignupRequestDto
 {

@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
 using Chatly.Data;
 using Chatly.DTO;
+using Chatly.DTO.Accounts;
 using Chatly.Extensions;
 using Chatly.Interfaces.Repositories;
 using Chatly.Models;

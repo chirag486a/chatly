@@ -2,6 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using Chatly.DTO;
+using Chatly.DTO.Accounts;
 using Chatly.Interfaces.Services;
 using Chatly.Models;
 using Microsoft.IdentityModel.Tokens;

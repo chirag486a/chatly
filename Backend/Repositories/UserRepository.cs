@@ -1,5 +1,6 @@
 using Chatly.Data;
 using Chatly.DTO;
+using Chatly.DTO.Accounts;
 using Chatly.Interfaces.Repositories;
 using Chatly.Models;
 using Microsoft.AspNetCore.Identity;

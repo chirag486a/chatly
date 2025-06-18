@@ -1,3 +1,5 @@
+using Chatly.DTO.Accounts;
+
 namespace Chatly.DTO;
 
 // ----------------------------

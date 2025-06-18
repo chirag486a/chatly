@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using Chatly.DTO;
+using Chatly.DTO.Accounts;
 using Chatly.Interfaces.Services;
 using Chatly.Models;
 using Microsoft.AspNetCore.Authorization;
