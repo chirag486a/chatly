@@ -25,7 +25,7 @@ public class AccountsController : ControllerBase
         _tokenService = tokenService;
     }
 
-    [HttpPost("signup")]
+    [HttpPost]
     [AllowAnonymous]
     public async Task<IActionResult> Signup([FromBody] SignupRequestDto request)
     {
