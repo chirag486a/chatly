@@ -1,4 +1,5 @@
 using System.Net;
+using Chatly.Controllers;
 using Chatly.Data;
 using Chatly.DTO;
 using Chatly.DTO.Contacts;
@@ -20,7 +21,7 @@ public class ContactRepository : IContactRepository
         _dbContext = dbContext;
     }
 
-    public async Task<CreateContactResponseDto> Create(CreateContactRequestDto request, string userId)
+    public async Task<CreateContactResponseDto> Create(CreateContactRequestDto request, string userId, string userName)
     {
         try
         {
@@ -46,17 +47,22 @@ public class ContactRepository : IContactRepository
                     .AddError("ContactUserId", $"The contact details matched the requester user id {userId}");
             }
 
-            if (string.IsNullOrEmpty(request.ContactUserId) ||
-                (await _dbContext.Users.FirstOrDefaultAsync(u => u.Id == request.ContactUserId) is var user &&
-                 user == null))
+            var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.Id == request.ContactUserId);
+
+            if (string.IsNullOrEmpty(request.ContactUserId) || user is null)
             {
-                throw new NotFoundException("Unable to add users to contact").SetErrorDetails("User does not exits")
-                    .AddError("ContactUserId", "User does not exits");
+                var error = new NotFoundException("Unable to add users to contact")
+                    .SetErrorDetails("User does not exits")
+                    .AddError("ContactUserId", "User does not exits with the user id");
+                user = await _dbContext.Users.FirstOrDefaultAsync(u => u.UserName == request.ContactUserName) ??
+                       throw error.AddError("ContactUserName", "User does not exit with the username");
             }
 
             var currentContact = await _dbContext.Contacts.FirstOrDefaultAsync(u =>
-                (u.ContactId == request.ContactUserId && u.UserId == userId) &&
-                (u.ContactId == userId && u.UserId == request.ContactUserId)
+                (u.UserId == userId && u.ContactId == request.ContactUserId) ||
+                (u.UserId == request.ContactUserId && u.ContactId == userId) ||
+                (u.User.UserName == userName && u.ContactUser.UserName == request.ContactUserName) ||
+                (u.User.UserName == request.ContactUserName && u.ContactUser.UserName == userName)
             );
 
 
@@ -103,45 +109,8 @@ public class ContactRepository : IContactRepository
                 e.InnerException != null ? e.InnerException.Message : e.Message);
         }
     }
+    
 
-    public async Task AcceptRequest()
-    {
-    }
-
-
-    public async Task<List<Contact>> GetUserContacts(string userId)
-    {
-        try
-        {
-            var contact = await _dbContext.Contacts.Where(x => x.UserId == userId || x.ContactId == userId)
-                .ToListAsync();
-            if (contact == null)
-            {
-                throw new NotFoundException("Unable to get contact", "User not found in database");
-            }
-
-            return contact;
-        }
-        catch (ArgumentException e)
-        {
-            throw new ApplicationArgumentException("Argument is null or empty", e.ParamName,
-                "The argument cannot be null or empty").AddError("Is null or empty");
-        }
-        catch (OperationCanceledException e)
-        {
-            Console.WriteLine(e.Message);
-            throw new InternalServerException("Operation Cancelled", "Something went wrong in database operation");
-        }
-        catch (NotFoundException e)
-        {
-            throw;
-        }
-        catch (Exception e)
-        {
-            Console.WriteLine(e.Message);
-            throw new InternalServerException("Internal Server Error", "Something went wrong in the server");
-        }
-    }
 
     public async Task<Contact> UpdateUserRequestAsync(AcceptRequestRequestDto request, string userId)
     {
@@ -151,7 +120,9 @@ public class ContactRepository : IContactRepository
                 await _dbContext.Contacts.FirstOrDefaultAsync(x => x.Id == request.ContactId && x.ContactId == userId);
             if (contact == null)
             {
-                throw new NotFoundException("Unable to get contact", "Contact not found");
+                throw new NotFoundException("Request not found",
+                    "Either you are not the requester or contact does not exits").AddError("Contact",
+                    "No request found");
             }
 
             if (contact.Status != ContactStatus.Pending)
@@ -182,31 +153,53 @@ public class ContactRepository : IContactRepository
         }
     }
 
-    public async Task<Contact> BlockUserAsync(BlockRequestDto request, string userId)
+    public async Task<Contact> BlockUserAsync(BlockRequestDto request, string userId, string userName)
     {
         try
         {
-            var contact = await _dbContext.Contacts.FirstOrDefaultAsync(x =>
-                (x.UserId == userId || x.ContactId == userId) &&
-                (x.UserId == request.ContactUserId || x.ContactId == request.ContactUserId)
-            );
+            var contact = await _dbContext.Contacts
+                .Include(u => u.ContactUser)
+                .Include(u => u.User)
+                .FirstOrDefaultAsync(x =>
+                    ((x.UserId == userId && x.ContactId == request.ContactUserId) ||
+                     (x.UserId == request.ContactUserId && x.ContactId == userId)) ||
+                    (x.User.UserName == request.ContactUserName && x.ContactUser.UserName == userName) ||
+                    (x.User.UserName == userName && x.ContactUser.UserName == request.ContactUserName)
+                );
             if (contact == null)
             {
-                var temp = await Create(new CreateContactRequestDto { ContactUserId = request.ContactUserId }, userId);
+                var temp = await Create(
+                    new CreateContactRequestDto
+                        { ContactUserId = request.ContactUserId, ContactUserName = request.ContactUserName }, userId,
+                    userName);
                 contact = await _dbContext.Contacts.FirstOrDefaultAsync(x => x.Id == temp.Id);
             }
+
+            Console.WriteLine(contact.User.UserName);
+            Console.WriteLine(contact.ContactUser.UserName);
 
             if (contact == null)
             {
                 throw new InternalServerException("Something went wrong", "Something went wrong");
             }
 
-            if (contact.Status == ContactStatus.Blocked)
+            if (contact.Status == ContactStatus.Blocked && request.IsBlocked)
             {
                 throw new ConflictException("Unable to block contact", "Contact is not blocked Already");
             }
 
-            contact.Status = ContactStatus.Blocked;
+            if (contact.Status != ContactStatus.Blocked && !request.IsBlocked)
+            {
+                throw new ConflictException("Unable to unblock", "Contact is not not blocked");
+            }
+
+
+            if (request.IsBlocked)
+            {
+                contact.Status = ContactStatus.Blocked;
+            }
+            else contact.Status = ContactStatus.None;
+
 
             if (contact.UserId != userId)
             {
@@ -235,5 +228,35 @@ public class ContactRepository : IContactRepository
             throw new InternalServerException("Something went wrong.", "Internal server exception");
         }
     }
+
+    public async Task<GetUserContactsResponseDto> GetAllUserContactsAsync(GetUserContactsRequestDto request,
+        string userId)
+    {
+        try
+        {
+            request.PageSize = request.PageSize < 1 ? 1 : request.PageSize;
+            request.Page = request.Page < 1 ? 10 : request.Page;
+            var contacts = await _dbContext.Contacts.Where(x =>
+                (x.UserId == userId || x.ContactId == userId) &&
+                (x.Status != ContactStatus.Blocked)
+            ).Skip((request.Page - 1) * request.PageSize).Take(request.PageSize).ToListAsync();
+            var contactsCounts = await _dbContext.Contacts.Where(x =>
+                (x.UserId == userId || x.ContactId == userId) &&
+                (x.Status != ContactStatus.Blocked)
+            ).CountAsync();
+            return new GetUserContactsResponseDto
+            {
+                Contacts = contacts,
+                Total = contactsCounts
+            };
+        }
+        catch (ArgumentNullException e)
+        {
+            if (e.InnerException is not null)
+                throw new ApplicationArgumentException(e.InnerException.Message, e.ParamName);
+            throw new ApplicationArgumentException("Invalid parameter", e.ParamName);
+        }
+    }
+
     // update contact status
 }
