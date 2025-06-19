@@ -1,6 +1,3 @@
-using System.Net;
-using System.Runtime.CompilerServices;
-using Chatly.Data;
 using Chatly.DTO;
 using Chatly.DTO.Contacts;
 using Chatly.Exceptions;
@@ -8,9 +5,7 @@ using Chatly.Extensions;
 using Chatly.Interfaces.Repositories;
 using Chatly.Models;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using ApplicationException = Chatly.Exceptions.ApplicationException;
 
 namespace Chatly.Controllers;
@@ -42,7 +37,7 @@ public class ContactsController : ControllerBase
 
 
             var newContact = await _contactRepository.Create(request, currUserId, currUserName);
-            return CreatedAtAction("", new { userId = newContact.Id }, // This is the routeValues object
+            return CreatedAtAction("", new { userId = newContact.Id },
                 ApiResponse<CreateContactResponseDto>.SuccessResponse(newContact, "Added contact", null,
                     StatusCodes.Status201Created));
         }
