@@ -1,4 +1,4 @@
-namespace Chatly.DTO.Contacts;
+namespace Chatly.DTO;
 
 // ----------------------------
 // ➕ 7: Send Friend/Follow Request
@@ -6,7 +6,6 @@ namespace Chatly.DTO.Contacts;
 public class CreateContactRequestDto
 {
     public string? ContactUserId { get; set; }
-    public string? ContactUserName { get; set; }
 }
 
 public class CreateContactResponseDto

@@ -7,7 +7,6 @@ using Chatly.Exceptions;
 using Chatly.Extensions;
 using Chatly.Interfaces.Repositories;
 using Chatly.Models;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -33,16 +32,16 @@ public class ContactsController : ControllerBase
         try
         {
             var currUserId = User.GetUserId();
-            var currUserName = User.GetUserName();
-            if (currUserId == null || currUserName == null)
+            if (currUserId == null)
             {
                 throw new ApplicationUnauthorizedAccessException("User not logged in", "The user id is null").AddError(
                     "UserId", "User id is null");
             }
 
 
-            var newContact = await _contactRepository.Create(request, currUserId, currUserName);
-            return CreatedAtAction("", new { userId = newContact.Id }, // This is the routeValues object
+            var newContact = await _contactRepository.Create(request, currUserId);
+            return CreatedAtAction(nameof(GetContact),
+                new { userId = newContact.Id }, // This is the routeValues object
                 ApiResponse<CreateContactResponseDto>.SuccessResponse(newContact, "Added contact", null,
                     StatusCodes.Status201Created));
         }
@@ -79,26 +78,26 @@ public class ContactsController : ControllerBase
     }
 
     [HttpGet]
-    [Authorize]
-    public async Task<IActionResult> GetContacts([FromRoute] GetUserContactsRequestDto request)
+    public async Task<IActionResult> GetContacts()
+    {
+        return Ok();
+    }
+
+    [HttpGet("{userId}")]
+    public async Task<IActionResult> GetContact([FromRoute] string userId)
     {
         try
         {
-            var curUser = User.GetUserId();
-            if (curUser == null)
-            {
-                throw new ApplicationUnauthorizedAccessException("User not logged in", "The user id is null");
-            }
-
-            var response = await _contactRepository.GetAllUserContactsAsync(request, curUser);
-
-            return Ok(ApiResponse<List<Contact>>.SuccessResponse(
-                data: response.Contacts,
-                message: "Contacts",
-                totalCount: response.Total,
-                statusCode: StatusCodes.Status200OK));
+            var contact = await _contactRepository.GetUserContacts(userId);
+            return Ok(ApiResponse<List<Contact>>.SuccessResponse(contact, "Contact found", null,
+                StatusCodes.Status200OK));
         }
-        catch (ApplicationUnauthorizedAccessException e)
+        catch (NotFoundException e)
+        {
+            return NotFound(
+                ApiResponse<object>.ErrorResponse(e.Message, e.StatusCode, e.ErrorCode, e.Details, e.Errors));
+        }
+        catch (ApplicationException e)
         {
             return this.InternalServerError(
                 ApiResponse<object>.ErrorResponse(e.Message, e.StatusCode, e.ErrorCode, e.Details, e.Errors));
@@ -142,24 +141,22 @@ public class ContactsController : ControllerBase
     }
 
     [HttpPatch("block")]
-    [Authorize]
     public async Task<IActionResult> Block([FromBody] BlockRequestDto request)
     {
         try
         {
-            var currUserId = User.GetUserId();
-            var currUserName = User.GetUserName();
-            if (currUserId == null || currUserName == null)
+            var currUser = User.GetUserId();
+            if (currUser == null)
             {
                 throw new ApplicationUnauthorizedAccessException("User not logged in", "The user id is null");
             }
 
-            var contact = await _contactRepository.BlockUserAsync(request, currUserId, currUserName);
+            var contact = await _contactRepository.BlockUserAsync(request, currUser);
 
             return Accepted(ApiResponse<BlockResponseDto>.SuccessResponse(new BlockResponseDto
                 {
-                    ContactId = contact.Id,
-                }, request.IsBlocked ? "Blocked successfully" : "Unblocked successfully", null,
+                    ContactId = request.ContactUserId,
+                }, "Blocked successfully", null,
                 StatusCodes.Status200OK));
         }
         catch (NotFoundException e)
@@ -170,11 +167,6 @@ public class ContactsController : ControllerBase
         catch (ConflictException e)
         {
             return Conflict(
-                ApiResponse<object>.ErrorResponse(e.Message, e.StatusCode, e.ErrorCode, e.Details, e.Errors));
-        }
-        catch (ApplicationUnauthorizedAccessException e)
-        {
-            return Unauthorized(
                 ApiResponse<object>.ErrorResponse(e.Message, e.StatusCode, e.ErrorCode, e.Details, e.Errors));
         }
         catch (InternalServerException e)
