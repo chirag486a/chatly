@@ -74,7 +74,7 @@ public class ApplicationException<T> : ApplicationException where T : Applicatio
 
     public virtual T SetErrorDetails(string errorDetails)
     {
-        this.ErrorCode = errorDetails;
+        Details = errorDetails;
         return (T)this;
     }
 }
