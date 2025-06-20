@@ -21,61 +21,75 @@ public class ContactRepository : IContactRepository
         _dbContext = dbContext;
     }
 
-    public async Task<CreateContactResponseDto> Create(CreateContactRequestDto request, string userId, string userName)
+    public async Task<Contact> Create(
+        string? userId = null,
+        string? contactUserId = null,
+        string? currUserName = null,
+        string? contactUserName = null)
     {
         try
         {
-            var currUserId = userId;
-            if (string.IsNullOrEmpty(userId))
+            if (string.IsNullOrEmpty(userId) && string.IsNullOrEmpty(currUserName))
             {
                 throw new ApplicationArgumentException("Invalid input", nameof(userId))
                     .SetErrorDetails("User id is null or empty")
-                    .AddError("User id is required");
+                    .AddError("UserId", "User id is required");
             }
 
-            if (await _dbContext.Users.FirstOrDefaultAsync(x => x.Id == userId) is var currUser && currUser == null)
+            var currUser =
+                await _dbContext.Users.FirstOrDefaultAsync(x => x.Id == userId || x.UserName == currUserName);
+            if (currUser == null)
             {
                 throw new NotFoundException($"Couldn't create contact for user {userId}")
                     .AddError("userId", "Not found")
                     .SetErrorDetails("The current user id could not be found");
             }
 
-            if (!string.IsNullOrEmpty(request.ContactUserId) && request.ContactUserId == userId)
+
+            if (!string.IsNullOrEmpty(contactUserName) &&
+                !string.IsNullOrEmpty(contactUserId))
+            {
+                throw new ApplicationArgumentException("Invalid input", nameof(contactUserId)).AddParam(
+                        nameof(contactUserName))
+                    .AddError("ContactUserId", "Contact user id is required if contact username is null")
+                    .AddError("ContactUserName", "Contact user name is null")
+                    .SetErrorDetails("Can't create contact for null user");
+            }
+
+            if (contactUserId == userId || contactUserName == currUserName)
             {
                 throw new ConflictException("Couldn't create contact user")
                     .SetErrorDetails("The contact details matched the requester user")
                     .AddError("ContactUserId", $"The contact details matched the requester user id {userId}");
             }
 
-            var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.Id == request.ContactUserId);
+            var contactUser = await _dbContext.Users.FirstOrDefaultAsync(u =>
+                u.Id == contactUserId || u.UserName == contactUserName);
 
-            if (string.IsNullOrEmpty(request.ContactUserId) || user is null)
+            if (contactUser == null)
             {
-                var error = new NotFoundException("Unable to add users to contact")
+                throw new NotFoundException("Unable to create contact")
                     .SetErrorDetails("User does not exits")
                     .AddError("ContactUserId", "User does not exits with the user id");
-                user = await _dbContext.Users.FirstOrDefaultAsync(u => u.UserName == request.ContactUserName) ??
-                       throw error.AddError("ContactUserName", "User does not exit with the username");
             }
 
-            var currentContact = await _dbContext.Contacts.FirstOrDefaultAsync(u =>
-                (u.UserId == userId && u.ContactId == request.ContactUserId) ||
-                (u.UserId == request.ContactUserId && u.ContactId == userId) ||
-                (u.User.UserName == userName && u.ContactUser.UserName == request.ContactUserName) ||
-                (u.User.UserName == request.ContactUserName && u.ContactUser.UserName == userName)
+            var ifExists = await _dbContext.Contacts.AnyAsync(u =>
+                (u.UserId == currUser.Id && u.ContactId == contactUser.Id) ||
+                (u.ContactId == currUser.Id && u.UserId == contactUser.Id)
             );
 
 
-            if (currentContact != null)
+            if (ifExists)
             {
                 throw new ConflictException("Unable to add contact", "The contact already exits").AddError("Contact",
                     "The contact already exits");
             }
 
+
             var newContact = new Contact
             {
                 Id = Guid.NewGuid().ToString(),
-                ContactId = user.Id,
+                ContactId = contactUser.Id,
                 UserId = currUser.Id,
                 Status = ContactStatus.Pending,
                 CreatedAt = DateTime.Now,
@@ -91,11 +105,7 @@ public class ContactRepository : IContactRepository
                     "SERVER", "Database error");
             }
 
-            return new CreateContactResponseDto
-            {
-                Id = newContact.Id,
-                RequestStatus = newContact.Status.ToString(),
-            };
+            return newContact;
         }
         catch (ApplicationException e)
         {
@@ -109,146 +119,144 @@ public class ContactRepository : IContactRepository
                 e.InnerException != null ? e.InnerException.Message : e.Message);
         }
     }
-    
 
-
-    public async Task<Contact> UpdateUserRequestAsync(AcceptRequestRequestDto request, string userId)
+    public async Task<Contact> UpdateAsync(
+        string? contactId = null,
+        string? userId = null,
+        string? contactUserId = null,
+        ContactStatus? contactStatus = null,
+        bool? chatDeleted = null,
+        bool? mutated = null,
+        bool? archived = null,
+        int? unreadCount = null
+    )
     {
-        try
-        {
-            var contact =
-                await _dbContext.Contacts.FirstOrDefaultAsync(x => x.Id == request.ContactId && x.ContactId == userId);
-            if (contact == null)
-            {
-                throw new NotFoundException("Request not found",
-                    "Either you are not the requester or contact does not exits").AddError("Contact",
-                    "No request found");
-            }
+        var contact = await _dbContext.Contacts.FirstOrDefaultAsync(c => c.Id == contactId) ??
+                      throw new NotFoundException("Unable to update contact",
+                          $"Contact with {contactId} as contact id does not exists");
 
-            if (contact.Status != ContactStatus.Pending)
-            {
-                throw new ConflictException("Unable to update contact", "Contact is not pending");
-            }
+        var contactUser = await _dbContext.Users.FirstOrDefaultAsync(u => u.Id == contactUserId);
+        var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.Id == userId);
 
-            contact.Status = request.IsAccepted ? ContactStatus.Accepted : ContactStatus.None;
-            _dbContext.Contacts.Update(contact);
-            await _dbContext.SaveChangesAsync();
-            return contact;
-        }
-        catch (DbUpdateException e)
+        //  Checking if the provided ids(contactUserId, userId) matches the ids stored in contact
+        if (
+            !(string.IsNullOrEmpty(contactUserId) ||
+              string.IsNullOrEmpty(userId)) &&
+            !((contact.ContactId == contactId && contact.UserId == userId) ||
+              (contact.ContactId == userId && contact.UserId == contactId)))
         {
-            if (e.InnerException is not null)
-                Console.WriteLine(e.InnerException.Message);
-            throw new InternalServerException("Something went wrong.", "Something went wrong in database operation")
-                .AddError("DB", "Failed to update contact");
+            throw new ApplicationUnauthorizedAccessException("Unable to update contact",
+                "The contact users does not belong to this contact");
         }
-        catch (ApplicationException e)
-        {
-            throw;
-        }
-        catch (Exception e)
-        {
-            Console.WriteLine(e.Message);
-            throw new InternalServerException("Something went wrong.", "Internal server exception");
-        }
+
+
+        contact.ContactId = contactUser?.Id ?? contact.ContactId;
+        contact.UserId = user?.Id ?? contact.UserId;
+        contact.Status = contactStatus ?? contact.Status;
+        contact.ChatDeleted = chatDeleted ?? contact.ChatDeleted;
+        contact.Mutated = mutated ?? contact.Mutated;
+        contact.Archived = archived ?? contact.Archived;
+        contact.UnreadCount = unreadCount ?? contact.UnreadCount;
+
+        _dbContext.Contacts.Update(contact);
+        await _dbContext.SaveChangesAsync();
+        return contact;
     }
 
-    public async Task<Contact> BlockUserAsync(BlockRequestDto request, string userId, string userName)
+    public async Task<Contact?> GetAsync(
+        string? contactId = null,
+        string? contactUserId = null,
+        string? contactUserName = null,
+        string? userId = null
+    )
     {
-        try
+        var error = new ApplicationArgumentException("Unable to retrieve contact", nameof(contactId));
+        if (contactId == null && userId == null)
         {
-            var contact = await _dbContext.Contacts
-                .Include(u => u.ContactUser)
-                .Include(u => u.User)
-                .FirstOrDefaultAsync(x =>
-                    ((x.UserId == userId && x.ContactId == request.ContactUserId) ||
-                     (x.UserId == request.ContactUserId && x.ContactId == userId)) ||
-                    (x.User.UserName == request.ContactUserName && x.ContactUser.UserName == userName) ||
-                    (x.User.UserName == userName && x.ContactUser.UserName == request.ContactUserName)
-                );
-            if (contact == null)
-            {
-                var temp = await Create(
-                    new CreateContactRequestDto
-                        { ContactUserId = request.ContactUserId, ContactUserName = request.ContactUserName }, userId,
-                    userName);
-                contact = await _dbContext.Contacts.FirstOrDefaultAsync(x => x.Id == temp.Id);
-            }
-
-            Console.WriteLine(contact.User.UserName);
-            Console.WriteLine(contact.ContactUser.UserName);
-
-            if (contact == null)
-            {
-                throw new InternalServerException("Something went wrong", "Something went wrong");
-            }
-
-            if (contact.Status == ContactStatus.Blocked && request.IsBlocked)
-            {
-                throw new ConflictException("Unable to block contact", "Contact is not blocked Already");
-            }
-
-            if (contact.Status != ContactStatus.Blocked && !request.IsBlocked)
-            {
-                throw new ConflictException("Unable to unblock", "Contact is not not blocked");
-            }
-
-
-            if (request.IsBlocked)
-            {
-                contact.Status = ContactStatus.Blocked;
-            }
-            else contact.Status = ContactStatus.None;
-
-
-            if (contact.UserId != userId)
-            {
-                contact.ContactId = contact.UserId;
-                contact.UserId = userId;
-            }
-
-            _dbContext.Contacts.Update(contact);
-            await _dbContext.SaveChangesAsync();
-            return contact;
+            throw error.AddError("UserId", "If contact id is null userId must be provided").AddParam(nameof(userId))
+                .SetErrorDetails("Could not find contact when both contact id and userid are null");
         }
-        catch (DbUpdateException e)
+
+        Contact? contact = null;
+        contact = await _dbContext.Contacts.FirstOrDefaultAsync(c => c.Id == contactId);
+
+
+        if (contact == null && !string.IsNullOrEmpty(userId) && !string.IsNullOrEmpty(contactUserId))
         {
-            if (e.InnerException is not null)
-                Console.WriteLine(e.InnerException.Message);
-            throw new InternalServerException("Something went wrong.", "Something went wrong in database operation")
-                .AddError("DB", "Failed to update contact");
+            contact = await _dbContext.Contacts.FirstOrDefaultAsync(c =>
+                (c.UserId == userId && c.ContactId == contactId) ||
+                (c.ContactId == userId && c.UserId == contactId)
+            );
         }
-        catch (ApplicationException e)
+
+        if (string.IsNullOrEmpty(contactUserId))
         {
-            throw;
+            error.AddError("ContactUserId", "Contact user id field is null but not required")
+                .AddParam(nameof(contactUserId));
         }
-        catch (Exception e)
+
+        if (contact == null && !string.IsNullOrEmpty(userId) && !string.IsNullOrEmpty(contactUserName))
         {
-            Console.WriteLine(e.Message);
-            throw new InternalServerException("Something went wrong.", "Internal server exception");
+            var contactUser = await _dbContext.Users.FirstOrDefaultAsync(u => u.UserName == contactUserName) ??
+                              throw error
+                                  .AddParam(nameof(contactUserName))
+                                  .AddError(
+                                      "ContactUserName",
+                                      "If other fields are discarded contact username is a must")
+                                  .SetErrorDetails(
+                                      "Could not find the contact user to get contact or contact doesnot exits");
+            contact = await _dbContext.Contacts.FirstOrDefaultAsync(c =>
+                (c.UserId == userId && c.ContactId == contactUser.Id) ||
+                (c.ContactId == userId && c.UserId == contactUser.Id)
+            );
         }
+
+        return contact;
     }
 
-    public async Task<GetUserContactsResponseDto> GetAllUserContactsAsync(GetUserContactsRequestDto request,
-        string userId)
+    public async Task<(List<Contact>, int)> GetAllAsync(
+        string? userId = null,
+        int page = 1,
+        int pageSize = 10,
+        bool excludeBlocked = true,
+        bool excludeNone = true,
+        bool onlyBlocked = false,
+        bool onlyNone = false
+    )
+
     {
         try
         {
-            request.PageSize = request.PageSize < 1 ? 1 : request.PageSize;
-            request.Page = request.Page < 1 ? 10 : request.Page;
-            var contacts = await _dbContext.Contacts.Where(x =>
-                (x.UserId == userId || x.ContactId == userId) &&
-                (x.Status != ContactStatus.Blocked)
-            ).Skip((request.Page - 1) * request.PageSize).Take(request.PageSize).ToListAsync();
-            var contactsCounts = await _dbContext.Contacts.Where(x =>
-                (x.UserId == userId || x.ContactId == userId) &&
-                (x.Status != ContactStatus.Blocked)
-            ).CountAsync();
-            return new GetUserContactsResponseDto
+            var queryable = _dbContext.Contacts.Where(x =>
+                (x.UserId == userId || x.ContactId == userId)
+            );
+            // return (queryable.ToList(), 3);
+            if (onlyBlocked)
             {
-                Contacts = contacts,
-                Total = contactsCounts
-            };
+                queryable = queryable.Where(x => x.Status == ContactStatus.Blocked);
+            }
+
+            if (onlyNone)
+            {
+                queryable = queryable.Where(x => x.Status == ContactStatus.None);
+            }
+
+            if (excludeBlocked)
+            {
+                queryable = queryable.Where(x => x.Status != ContactStatus.None);
+            }
+
+            if (excludeNone)
+            {
+                queryable = queryable.Where(x => x.Status != ContactStatus.None);
+            }
+
+            var contactsCounts = await queryable.CountAsync();
+            queryable = queryable.Skip((page - 1) * pageSize).Take(pageSize);
+            var contacts = await queryable.ToListAsync();
+
+
+            return (contacts, contactsCounts);
         }
         catch (ArgumentNullException e)
         {
@@ -257,6 +265,4 @@ public class ContactRepository : IContactRepository
             throw new ApplicationArgumentException("Invalid parameter", e.ParamName);
         }
     }
-
-    // update contact status
 }

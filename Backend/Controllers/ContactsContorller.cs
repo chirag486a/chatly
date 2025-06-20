@@ -23,7 +23,7 @@ public class ContactsController : ControllerBase
 
 
     [HttpPost]
-    public async Task<IActionResult> Create(CreateContactRequestDto request)
+    public async Task<IActionResult> SendRequest(CreateContactRequestDto request)
     {
         try
         {
@@ -35,10 +35,36 @@ public class ContactsController : ControllerBase
                     "UserId", "User id is null");
             }
 
+            var existingContact = await _contactRepository.GetAsync(userId: currUserId,
+                contactId: request.ContactUserId, contactUserName: request.ContactUserName);
+            if (existingContact == null)
+            {
+                existingContact =
+                    await _contactRepository.Create(
+                        userId: currUserId,
+                        currUserName: User.GetUserName(),
+                        contactUserId: request.ContactUserId,
+                        contacctUsername: request.ContactUserName
+                    );
+            }
 
-            var newContact = await _contactRepository.Create(request, currUserId, currUserName);
-            return CreatedAtAction("", new { userId = newContact.Id },
-                ApiResponse<CreateContactResponseDto>.SuccessResponse(newContact, "Added contact", null,
+            if (existingContact.Status == ContactStatus.None)
+            {
+                existingContact =
+                    await _contactRepository.UpdateAsync(contactId: existingContact.Id,
+                        contactStatus: ContactStatus.Pending);
+            }
+            else
+                throw new ConflictException("Cant send request", $"The contact status is {existingContact.Status}")
+                    .AddError("ContactStatus", $"The contact status is {existingContact.Status}");
+
+
+            return CreatedAtAction(nameof(GetContact), new { contactId = existingContact.Id },
+                ApiResponse<CreateContactResponseDto>.SuccessResponse(new CreateContactResponseDto
+                    {
+                        Id = existingContact.Id,
+                        RequestStatus = existingContact.Status.ToString() ?? "ERR",
+                    }, "Added contact", null,
                     StatusCodes.Status201Created));
         }
         catch (ApplicationUnauthorizedAccessException e)
@@ -73,9 +99,17 @@ public class ContactsController : ControllerBase
         }
     }
 
+    [HttpGet("{contactId}")]
+    [Authorize]
+    public async Task<IActionResult> GetContact([FromRoute] string contactId)
+    {
+        var c = await _contactRepository.GetAsync(contactId: contactId);
+        return Ok(ApiResponse<Contact?>.SuccessResponse(c, "Contact found", null, statusCode: StatusCodes.Status200OK));
+    }
+
     [HttpGet]
     [Authorize]
-    public async Task<IActionResult> GetContacts([FromRoute] GetUserContactsRequestDto request)
+    public async Task<IActionResult> GetUserContacts([FromQuery] GetUserContactsRequestDto request)
     {
         try
         {
@@ -85,12 +119,13 @@ public class ContactsController : ControllerBase
                 throw new ApplicationUnauthorizedAccessException("User not logged in", "The user id is null");
             }
 
-            var response = await _contactRepository.GetAllUserContactsAsync(request, curUser);
+            var (contactList, count) = await _contactRepository.GetAllAsync(curUser, request.Page, request.PageSize,
+                excludeBlocked: false, excludeNone: false, onlyBlocked: false, onlyNone: false);
 
             return Ok(ApiResponse<List<Contact>>.SuccessResponse(
-                data: response.Contacts,
+                data: contactList,
                 message: "Contacts",
-                totalCount: response.Total,
+                totalCount: count,
                 statusCode: StatusCodes.Status200OK));
         }
         catch (ApplicationUnauthorizedAccessException e)
@@ -100,8 +135,9 @@ public class ContactsController : ControllerBase
         }
     }
 
-    [HttpPatch("accept")]
-    public async Task<IActionResult> Accept([FromBody] AcceptRequestRequestDto request)
+    [HttpPatch("request/{contactId}")]
+    public async Task<IActionResult> ModifyRequest([FromRoute] string contactId,
+        [FromBody] AcceptRequestRequestDto request)
     {
         try
         {
@@ -111,12 +147,23 @@ public class ContactsController : ControllerBase
                 throw new ApplicationUnauthorizedAccessException("User not logged in", "The user id is null");
             }
 
-            var updatedContact = await _contactRepository.UpdateUserRequestAsync(request, currUser);
+            var contact = await _contactRepository.GetAsync(contactId);
+            if (contact.Status != ContactStatus.Pending)
+            {
+                throw new ConflictException("Unable to accept contact", "Request is not pending");
+            }
+
+            contact = await _contactRepository.UpdateAsync(contactId: contact.ContactId,
+                contactStatus: request.IsAccepted ? ContactStatus.Accepted : ContactStatus.None);
+
             return Accepted(ApiResponse<AcceptRequestResponseDto>.SuccessResponse(new AcceptRequestResponseDto
+
                 {
-                    ContactId = request.ContactId,
-                    IsAccepted = request.IsAccepted,
-                }, "Operation success", null,
+                    ContactId = contact.Id,
+                },
+                contact.Status == ContactStatus.Accepted
+                    ? "Request accepted successfully"
+                    : "Request rejected successfully", null,
                 StatusCodes.Status200OK));
         }
         catch (NotFoundException e)
@@ -149,7 +196,7 @@ public class ContactsController : ControllerBase
                 throw new ApplicationUnauthorizedAccessException("User not logged in", "The user id is null");
             }
 
-            var contact = await _contactRepository.BlockUserAsync(request, currUserId, currUserName);
+            var contact = await _contactRepository.UpdateAsync(request.ContactId, contactStatus: ContactStatus.Blocked);
 
             return Accepted(ApiResponse<BlockResponseDto>.SuccessResponse(new BlockResponseDto
                 {
