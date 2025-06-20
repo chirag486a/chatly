@@ -4,37 +4,35 @@ namespace Chatly.Exceptions;
 
 public class ApplicationArgumentException : ApplicationException<ApplicationArgumentException>
 {
-    public string? ParamName { get; protected set; }
+    public List<string>? ParamName { get; protected set; }
     public int? DefaultStatusCode { get; protected set; } = StatusCodes.Status500InternalServerError;
 
-    public ApplicationArgumentException(string? message, string? paramName) : base(message)
+    public ApplicationArgumentException(string? message, string paramName) : base(message)
     {
         Message = message;
         StatusCode = DefaultStatusCode;
-        ParamName = paramName;
+        ParamName = [paramName];
     }
 
-    public ApplicationArgumentException(string? message, string? paramName, string details) : base(message)
+    public ApplicationArgumentException(string? message, string paramName, string details) : base(message)
     {
         Message = message;
         StatusCode = DefaultStatusCode;
         ErrorCode = "INVALID_ARGUMENT";
-        ParamName = paramName;
+        ParamName = [paramName];
         Details = details;
     }
 
     public override ApplicationArgumentException SetErrorDetails(string errorDetails)
     {
-        return base.SetErrorDetails(errorDetails + $" [{ParamName}]");
+        ParamName = [];
+        return base.SetErrorDetails(errorDetails + $" [{string.Join(",", ParamName)}]");
     }
 
-    public virtual ApplicationArgumentException AddError(string error)
+    public virtual ApplicationArgumentException AddParam(string key)
     {
-        if (ParamName == null)
-        {
-            throw new ArgumentException("ParamName is not initialize for argument exception", nameof(ParamName));
-        }
-
-        return base.AddError(ParamName, error);
+        if (ParamName == null) ParamName = new List<string>();
+        ParamName.Add(key);
+        return this;
     }
 }
