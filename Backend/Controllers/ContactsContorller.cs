@@ -2,10 +2,12 @@ using Chatly.DTO;
 using Chatly.DTO.Contacts;
 using Chatly.Exceptions;
 using Chatly.Extensions;
+using Chatly.Hubs;
 using Chatly.Interfaces.Repositories;
 using Chatly.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using ApplicationException = Chatly.Exceptions.ApplicationException;
 
 namespace Chatly.Controllers;
@@ -15,15 +17,17 @@ namespace Chatly.Controllers;
 public class ContactsController : ControllerBase
 {
     private readonly IContactRepository _contactRepository;
+    private readonly IHubContext<ContactHub> _hubContext;
 
-    public ContactsController(IContactRepository contactRepository)
+    public ContactsController(IContactRepository contactRepository, IHubContext<ContactHub> hubContext)
     {
         _contactRepository = contactRepository;
+        _hubContext = hubContext;
     }
 
 
     [HttpPost]
-    public async Task<IActionResult> SendRequest(CreateContactRequestDto request)
+    public async Task<IActionResult> SendRequest(SendRequestRequestDto request)
     {
         try
         {
@@ -51,16 +55,35 @@ public class ContactsController : ControllerBase
             if (existingContact.Status == ContactStatus.None)
             {
                 existingContact =
-                    await _contactRepository.UpdateAsync(contactId: existingContact.Id,
-                        contactStatus: ContactStatus.Pending);
+                    await _contactRepository.UpdateAsync(
+                        contactId: existingContact.Id,
+                        contactStatus: ContactStatus.Pending,
+                        userId: currUserId,
+                        contactUserId: request.ContactUserId
+                    );
             }
             else
                 throw new ConflictException("Cant send request", $"The contact status is {existingContact.Status}")
                     .AddError("ContactStatus", $"The contact status is {existingContact.Status}");
 
+            if (existingContact.Status == ContactStatus.Pending)
+            {
+                var contactUserId = existingContact.ContactUser?.Id ?? request.ContactUserId ?? "abcdefghijl";
+                
+                await _hubContext.Clients.User(contactUserId).SendAsync("ReceiveRequest",
+                    ApiResponse<SendRequestResponseDto>.SuccessResponse(
+                        new SendRequestResponseDto
+                        {
+                            Id = existingContact.Id,
+                            RequestStatus = existingContact.Status.ToString() ?? "ERR",
+                        },
+                        "Received a contact request"
+                    )
+                );
+            }
 
             return CreatedAtAction(nameof(GetContact), new { contactId = existingContact.Id },
-                ApiResponse<CreateContactResponseDto>.SuccessResponse(new CreateContactResponseDto
+                ApiResponse<SendRequestResponseDto>.SuccessResponse(new SendRequestResponseDto
                     {
                         Id = existingContact.Id,
                         RequestStatus = existingContact.Status.ToString() ?? "ERR",
