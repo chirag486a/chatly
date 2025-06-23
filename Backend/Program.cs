@@ -1,6 +1,7 @@
 using System.Text;
 using Chatly.Data;
 using Chatly.DTO;
+using Chatly.Hubs;
 using Chatly.Interfaces.Repositories;
 using Chatly.Interfaces.Services;
 using Chatly.Models;
@@ -54,6 +55,24 @@ builder.Services.AddAuthentication(options =>
             ValidAudience = jwtAudience,
             IssuerSigningKey = encodedKey
         };
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+
+                // If the request is for SignalR hub path
+                var path = context.HttpContext.Request.Path;
+                if (!string.IsNullOrEmpty(accessToken) &&
+                    (path.StartsWithSegments("/contactHub")))
+                {
+                    // Read the token out of query string
+                    context.Token = accessToken;
+                }
+
+                return Task.CompletedTask;
+            }
+        };
     });
 
 
@@ -70,6 +89,18 @@ builder.Services.AddScoped<IPasswordFormatValidator, PasswordFormatValidator>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IContactRepository, ContactRepository>();
+builder.Services.AddSignalR();
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll", builder =>
+    {
+        builder
+            .AllowAnyMethod()
+            .AllowAnyHeader()
+            .SetIsOriginAllowed(_ => true)
+            .AllowCredentials();
+    });
+});
 
 
 var app = builder.Build();
@@ -90,11 +121,14 @@ foreach (var group in apiDescriptions)
     }
 }
 
+app.UseCors("AllowAll");
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.UseHttpsRedirection();
 app.MapControllers();
+app.MapHub<ContactHub>("/contactHub");
+
 app.MapFallback(() => Results.NotFound(ApiResponse<object>.ErrorResponse(
     "404 Not Found",
     400,

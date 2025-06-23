@@ -15,7 +15,7 @@ public class ApiResponse<T>
         T? data = default,
         string? message = null,
         int? totalCount = null,
-        int? statusCode = StatusCodes.Status202Accepted
+        int? statusCode = null
     )
     {
         return new ApiResponse<T>
