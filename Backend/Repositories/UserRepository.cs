@@ -86,4 +86,34 @@ public class UserRepository : IUserRepository
         await _userManager.DeleteAsync(user);
         return true;
     }
+
+    public async Task<User> UpdateUserAsync(string? userId = null, string? username = null, string? displayName = null,
+        string? theme = null)
+    {
+        var user = await _userManager.FindByIdAsync(userId);
+        if (user == null) throw new ApplicationArgumentException("The user could not be found", nameof(userId));
+        if (!string.IsNullOrEmpty(displayName))
+        {
+            user.DisplayName = displayName;
+        }
+
+        if (!string.IsNullOrEmpty(theme))
+        {
+            user.Theme = theme;
+        }
+
+        if (!string.IsNullOrEmpty(username) && await _context.Users.AnyAsync(u => u.UserName == username))
+        {
+            throw new ConflictException("The user name is already taken", $"User {username} already exists");
+        }
+
+        if (!string.IsNullOrEmpty(username))
+        {
+            user.UserName = username;
+        }
+
+        _context.Users.Update(user);
+        await _context.SaveChangesAsync();
+        return user;
+    }
 }

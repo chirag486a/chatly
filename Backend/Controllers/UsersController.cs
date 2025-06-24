@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using Chatly.Data;
 using Chatly.DTO;
 using Chatly.DTO.Accounts;
+using Chatly.DTO.Users;
 using Chatly.Exceptions;
 using Chatly.Extensions;
 using Chatly.Interfaces.Repositories;
@@ -50,23 +51,47 @@ public class UsersController : ControllerBase
         }
     }
 
-    // [HttpPatch("[action]")]
-    // [Authorize]
-    // public async Task<IActionResult> UpdateMe()
-    // {
-    //     try
-    //     {
-    //         
-    //     }
-    //     catch (Exception e)
-    //     {
-    //         return this.InternalServerError(ApiResponse<object>.ErrorResponse(
-    //             message: "Something went wrong",
-    //             statusCode: StatusCodes.Status500InternalServerError,
-    //             errorCode: "SERVER_ERROR"
-    //         ));
-    //     }
-    // }
+    [HttpPatch("[action]")]
+    [Authorize]
+    public async Task<IActionResult> UpdateMe(UserUpdateDto request)
+    {
+        try
+        {
+            var user = await _userRepository.UpdateUserAsync(userId: User.GetUserId(), request.Username,
+                request.DisplayName,
+                request.Theme);
+            return Accepted(ApiResponse<UserDto>.SuccessResponse(
+                new UserDto
+                {
+                    Id = user.Id,
+                    DisplayName = user.DisplayName,
+                    UserName = user.UserName,
+                    Theme = user.Theme,
+                    IsOnline = user.IsOnline,
+                    LastSeen = user.LastSeen,
+                    Email = user.Email,
+                }
+            ));
+        }
+        catch (ApplicationArgumentException e)
+        {
+            return this.InternalServerError(
+                ApiResponse<object>.ErrorResponse(e.Message, e.StatusCode, e.ErrorCode, e.Details, e.Errors));
+        }
+        catch (ConflictException e)
+        {
+            return Conflict(
+                ApiResponse<object>.ErrorResponse(e.Message, e.StatusCode, e.ErrorCode, e.Details, e.Errors));
+        }
+        catch (Exception e)
+        {
+            return this.InternalServerError(ApiResponse<object>.ErrorResponse(
+                message: "Something went wrong",
+                statusCode: StatusCodes.Status500InternalServerError,
+                errorCode: "SERVER_ERROR"
+            ));
+        }
+    }
 
 
     [HttpDelete("[action]")]
