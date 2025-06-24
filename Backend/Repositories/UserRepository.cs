@@ -1,10 +1,12 @@
 using Chatly.Data;
 using Chatly.DTO;
 using Chatly.DTO.Accounts;
+using Chatly.Exceptions;
 using Chatly.Interfaces.Repositories;
 using Chatly.Models;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using ApplicationException = Chatly.Exceptions.ApplicationException;
 
 namespace Chatly.Repositories;
 
@@ -64,5 +66,24 @@ public class UserRepository : IUserRepository
             Console.WriteLine(e.Message);
             throw new Exception("Something went wrong while processing the request");
         }
+    }
+
+    public async Task<bool> DeleteUserAsync(string? userId = null)
+    {
+        if (userId == null)
+            throw new ApplicationArgumentException("UserId cannot be null", nameof(userId)).AddError(nameof(userId),
+                "Cannot be null");
+        var user = await _userManager.FindByIdAsync(userId);
+        if (user == null)
+        {
+            throw new NotFoundException("The user could not be found",
+                $"User with user id : {userId} could not be found");
+        }
+
+        await _context.Contacts.Where(u => u.ContactId == user.Id || u.UserId == user.Id)
+            .ExecuteDeleteAsync();
+        await _context.Messages.Where(m => m.SenderId == user.Id || m.ReceiverId == user.Id).ExecuteDeleteAsync();
+        await _userManager.DeleteAsync(user);
+        return true;
     }
 }
