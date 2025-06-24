@@ -16,7 +16,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .HasOne(c => c.User)
             .WithMany()
             .HasForeignKey(c => c.UserId)
-            .OnDelete(DeleteBehavior.Cascade); // auto-dele
+            .OnDelete(DeleteBehavior.Restrict); // auto-dele
         
         modelBuilder.Entity<Contact>()
             .HasOne(c => c.ContactUser)
