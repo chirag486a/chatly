@@ -238,4 +238,44 @@ public class AccountsController : ControllerBase
         ));
     }
 
+    [HttpPatch("[action]")]
+    [Authorize]
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto request)
+    {
+        if (
+            string.IsNullOrEmpty(request.OldPassword) ||
+            string.IsNullOrEmpty(request.NewPassword)
+        )
+        {
+            return BadRequest(ApiResponse<object>.ErrorResponse("Invalid password provided.",
+                statusCode: StatusCodes.Status400BadRequest, errorCode: "INVALID_PASSWORD",
+                details: "The provided password is invalid."));
+        }
+
+        if (
+            (User.GetUserId() is var userId && userId == null) ||
+            (await _userManager.FindByIdAsync(userId) is var user && user == null)
+        )
+        {
+            return Unauthorized(
+                ApiResponse<object>.ErrorResponse("Unauthorized user",
+                    statusCode: StatusCodes.Status401Unauthorized, errorCode: "UNAUTHORIZED",
+                    "The user is not allowed to change your password")
+            );
+        }
+
+        var result = await _userManager.CheckPasswordAsync(user, request.OldPassword);
+        if (!result)
+        {
+            return Unauthorized(
+                ApiResponse<object>.ErrorResponse("Unauthorized user.",
+                    statusCode: StatusCodes.Status401Unauthorized, errorCode: "UNAUTHORIZED",
+                    "The user is not allowed to change your password.")
+            );
+        }
+
+        await _userManager.ChangePasswordAsync(user, request.OldPassword, request.NewPassword);
+        return Ok(ApiResponse<object>.SuccessResponse(null, "Your password has been changed.", null,
+            StatusCodes.Status200OK));
+    }
 }

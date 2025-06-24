@@ -50,6 +50,24 @@ public class UsersController : ControllerBase
         }
     }
 
+    // [HttpPatch("[action]")]
+    // [Authorize]
+    // public async Task<IActionResult> UpdateMe()
+    // {
+    //     try
+    //     {
+    //         
+    //     }
+    //     catch (Exception e)
+    //     {
+    //         return this.InternalServerError(ApiResponse<object>.ErrorResponse(
+    //             message: "Something went wrong",
+    //             statusCode: StatusCodes.Status500InternalServerError,
+    //             errorCode: "SERVER_ERROR"
+    //         ));
+    //     }
+    // }
+
 
     [HttpDelete("[action]")]
     [Authorize]
