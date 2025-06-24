@@ -108,6 +108,7 @@ public class AccountsController : ControllerBase
             };
             var result = await _userManager.CreateAsync(newUser, request.Password);
 
+
             foreach (var error in result.Errors)
             {
                 errorResponse.AddError(error.Code, error.Description);
@@ -128,6 +129,11 @@ public class AccountsController : ControllerBase
             {
                 throw new Exception("Something went wrong.");
             }
+
+            // BUG:
+            var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
+            var res = await _userManager.ConfirmEmailAsync(user, token);
+
 
             var tokenResult = _tokenService.GenerateJwtToken(user);
 
@@ -276,6 +282,65 @@ public class AccountsController : ControllerBase
 
         await _userManager.ChangePasswordAsync(user, request.OldPassword, request.NewPassword);
         return Ok(ApiResponse<object>.SuccessResponse(null, "Your password has been changed.", null,
+            StatusCodes.Status200OK));
+    }
+
+    [HttpPatch("[action]")]
+    [Authorize]
+    public async Task<IActionResult> ChangeEmail([FromBody] ChangeEmailDto request)
+    {
+        if (
+            string.IsNullOrEmpty(request.NewEmail) ||
+            string.IsNullOrEmpty(request.Password)
+        )
+        {
+            return BadRequest(ApiResponse<object>.ErrorResponse("Invalid password provided.",
+                statusCode: StatusCodes.Status400BadRequest, errorCode: "INVALID_FIELDS",
+                details: "The provided password is invalid."));
+        }
+
+
+        if (
+            (User.GetUserId() is var userId && userId == null) ||
+            (await _userManager.FindByIdAsync(userId) is var user && user == null)
+        )
+        {
+            return Unauthorized(
+                ApiResponse<object>.ErrorResponse("Unauthorized user",
+                    statusCode: StatusCodes.Status401Unauthorized, errorCode: "UNAUTHORIZED",
+                    "The user is not allowed to change your password")
+            );
+        }
+
+        if (
+            await _userManager.FindByEmailAsync(request.NewEmail) is var newEmailUser &&
+            newEmailUser != null &&
+            newEmailUser.Id != user.Id
+        )
+        {
+            return Conflict(
+                ApiResponse<object>.ErrorResponse("Email already taken", statusCode: StatusCodes.Status403Forbidden,
+                    errorCode: "EMAIL_ALREADY_TAKEN",
+                    details: $"The email address '{request.NewEmail}' is already associated with another account"
+                ).AddError("Email", "Already in use")
+            );
+        }
+
+        var result = await _userManager.CheckPasswordAsync(user, request.Password);
+        if (!result)
+        {
+            return Unauthorized(
+                ApiResponse<object>.ErrorResponse("Unauthorized user.",
+                    statusCode: StatusCodes.Status401Unauthorized, errorCode: "UNAUTHORIZED",
+                    "The user is not allowed to change your password.")
+            );
+        }
+
+        // BUG:
+        var token = await _userManager.GenerateChangeEmailTokenAsync(user, request.NewEmail);
+
+        await _userManager.ChangeEmailAsync(user, request.NewEmail, token);
+        return Ok(ApiResponse<object>.SuccessResponse(null, "Your email has been changed.", null,
             StatusCodes.Status200OK));
     }
 }
