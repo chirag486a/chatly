@@ -82,7 +82,7 @@ public class UserRepository : IUserRepository
 
         await _context.Contacts.Where(u => u.ContactId == user.Id || u.UserId == user.Id)
             .ExecuteDeleteAsync();
-        await _context.Messages.Where(m => m.SenderId == user.Id || m.ReceiverId == user.Id).ExecuteDeleteAsync();
+        // await _context.Messages.Where(m => m.SenderId == user.Id || m.ReceiverId == user.Id).ExecuteDeleteAsync();
         await _userManager.DeleteAsync(user);
         return true;
     }
