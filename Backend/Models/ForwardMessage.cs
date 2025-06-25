@@ -4,7 +4,7 @@ public class ForwardMessage
 {
     public string? Id { get; set; }
     public string? MessageId { get; set; }
-    public string? PreviousContent { get; set; }
+    public string? SubContent { get; set; }
     public string? PreviousContactId { get; set; }
     public string? PreviousSenderId { get; set; }
 
