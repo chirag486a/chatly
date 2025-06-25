@@ -8,7 +8,8 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<User> Users { get; set; }
     public DbSet<Contact> Contacts { get; set; }
     public DbSet<Message> Messages { get; set; }
-    public DbSet<ForwardedMessage> ForwardedMessages { get; set; }
+    public DbSet<ForwardMessage> ForwardMessages { get; set; }
+    public DbSet<ReplyMessage> ReplyMessages { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -17,7 +18,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .WithMany()
             .HasForeignKey(c => c.UserId)
             .OnDelete(DeleteBehavior.Restrict); // auto-dele
-        
+
         modelBuilder.Entity<Contact>()
             .HasOne(c => c.ContactUser)
             .WithMany()

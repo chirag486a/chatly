@@ -89,6 +89,8 @@ builder.Services.AddScoped<IPasswordFormatValidator, PasswordFormatValidator>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IContactRepository, ContactRepository>();
+builder.Services.AddScoped<IMessageRepository, MessageRepository>();
+
 builder.Services.AddSignalR();
 builder.Services.AddCors(options =>
 {

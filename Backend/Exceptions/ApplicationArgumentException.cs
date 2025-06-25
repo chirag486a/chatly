@@ -5,7 +5,7 @@ namespace Chatly.Exceptions;
 public class ApplicationArgumentException : ApplicationException<ApplicationArgumentException>
 {
     public List<string>? ParamName { get; protected set; }
-    public int? DefaultStatusCode { get; protected set; } = StatusCodes.Status500InternalServerError;
+    public int? DefaultStatusCode { get; protected set; } = StatusCodes.Status400BadRequest;
 
     public ApplicationArgumentException(string? message, string paramName) : base(message)
     {
