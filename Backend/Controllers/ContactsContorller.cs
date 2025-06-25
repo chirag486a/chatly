@@ -62,14 +62,17 @@ public class ContactsController : ControllerBase
                         contactUserId: request.ContactUserId
                     );
             }
-            else
-                throw new ConflictException("Cant send request", $"The contact status is {existingContact.Status}")
+
+            if (existingContact.Status == ContactStatus.Blocked)
+            {
+                throw new ConflictException("Can't send request", $"The contact status is {existingContact.Status}")
                     .AddError("ContactStatus", $"The contact status is {existingContact.Status}");
+            }
 
             if (existingContact.Status == ContactStatus.Pending)
             {
                 var contactUserId = existingContact.ContactUser?.Id ?? request.ContactUserId ?? "abcdefghijl";
-                
+
                 await _hubContext.Clients.User(contactUserId).SendAsync("ReceiveRequest",
                     ApiResponse<SendRequestResponseDto>.SuccessResponse(
                         new SendRequestResponseDto
@@ -97,7 +100,7 @@ public class ContactsController : ControllerBase
         }
         catch (ApplicationArgumentException e)
         {
-            return this.InternalServerError(
+            return BadRequest(
                 ApiResponse<object>.ErrorResponse(e.Message, e.StatusCode, e.ErrorCode, e.Details, e.Errors));
         }
         catch (NotFoundException e)
@@ -171,12 +174,17 @@ public class ContactsController : ControllerBase
             }
 
             var contact = await _contactRepository.GetAsync(contactId);
+            if (contact == null)
+            {
+                throw new NotFoundException("Contact not found");
+            }
+
             if (contact.Status != ContactStatus.Pending)
             {
                 throw new ConflictException("Unable to accept contact", "Request is not pending");
             }
 
-            contact = await _contactRepository.UpdateAsync(contactId: contact.ContactId,
+            contact = await _contactRepository.UpdateAsync(contactId: contact.Id,
                 contactStatus: request.IsAccepted ? ContactStatus.Accepted : ContactStatus.None);
 
             return Accepted(ApiResponse<AcceptRequestResponseDto>.SuccessResponse(new AcceptRequestResponseDto
