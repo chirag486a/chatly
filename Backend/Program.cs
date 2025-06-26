@@ -60,13 +60,14 @@ builder.Services.AddAuthentication(options =>
             OnMessageReceived = context =>
             {
                 var accessToken = context.Request.Query["access_token"];
-
-                // If the request is for SignalR hub path
                 var path = context.HttpContext.Request.Path;
+
                 if (!string.IsNullOrEmpty(accessToken) &&
-                    (path.StartsWithSegments("/contactHub")))
+                    (
+                        path.StartsWithSegments("/hubs")
+                    )
+                   )
                 {
-                    // Read the token out of query string
                     context.Token = accessToken;
                 }
 
@@ -107,29 +108,16 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-
-// Get all endpoints
-var apiDescriptionProvider = app.Services.GetRequiredService<IApiDescriptionGroupCollectionProvider>();
-var apiDescriptions = apiDescriptionProvider.ApiDescriptionGroups.Items;
-
-foreach (var group in apiDescriptions)
-{
-    foreach (var apiDescription in group.Items)
-    {
-        Console.WriteLine($"Path: {apiDescription.RelativePath}");
-        Console.WriteLine($"Method: {apiDescription.HttpMethod}");
-        Console.WriteLine($"Parameters: {string.Join(", ", apiDescription.ParameterDescriptions.Select(p => p.Name))}");
-        Console.WriteLine("---");
-    }
-}
-
 app.UseCors("AllowAll");
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.UseHttpsRedirection();
 app.MapControllers();
-app.MapHub<ContactHub>("/contactHub");
+
+//  Assign Access token for the specified hub routes in jwtBearerEvents.
+app.MapHub<ContactHub>("hubs/contact");
+app.MapHub<MessageHub>("hubs/message");
 
 app.MapFallback(() => Results.NotFound(ApiResponse<object>.ErrorResponse(
     "404 Not Found",
