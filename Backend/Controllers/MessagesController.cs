@@ -9,6 +9,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ApplicationException = Chatly.Exceptions.ApplicationException;
 using Chatly.DTO.Messages;
+using Chatly.Hubs;
+using Microsoft.AspNetCore.SignalR;
 
 namespace Chatly.Controllers;
 
@@ -16,10 +18,12 @@ namespace Chatly.Controllers;
 public class MessagesController : ControllerBase
 {
     IMessageRepository _repository;
+    IHubContext<MessageHub> _hub;
 
-    public MessagesController(IMessageRepository repository)
+    public MessagesController(IMessageRepository repository, IHubContext<MessageHub> hub)
     {
         _repository = repository;
+        _hub = hub;
     }
 
     [HttpPost("[action]")]
@@ -30,7 +34,7 @@ public class MessagesController : ControllerBase
         {
             var currUser = User.GetUserId();
             if (currUser == null) throw new ApplicationUnauthorizedAccessException("You are not logged in");
-            var (newMessage, newReplyMessage, newForwardMessage) = await _repository.CreateAsync(
+            var (newMessage, newReplyMessage, newForwardMessage, contact) = await _repository.CreateAsync(
                 contactId: request.ContactId,
                 senderId: currUser,
                 content: request.Content,
@@ -64,9 +68,20 @@ public class MessagesController : ControllerBase
                 };
             }
 
+            var receiver = contact.UserId == currUser ? contact.ContactId : contact.UserId;
+            if (receiver == null) throw new NotFoundException("Receiver does not exist");
+            await _hub.Clients.User(receiver)
+                .SendAsync("ReceiveMessage", ApiResponse<MessageResponseDto>.SuccessResponse(response));
+            Console.WriteLine(receiver);
+
             return CreatedAtAction(nameof(ReadMessage), ApiResponse<MessageResponseDto>.SuccessResponse(response,
                 "Message sent", null,
                 StatusCodes.Status201Created));
+        }
+        catch (NotFoundException ex)
+        {
+            return BadRequest(ApiResponse<object>.ErrorResponse(ex.Message, ex.StatusCode, ex.ErrorCode, ex.Details,
+                ex.Errors));
         }
         catch (ApplicationUnauthorizedAccessException ex)
         {
