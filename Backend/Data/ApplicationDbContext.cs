@@ -37,5 +37,17 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         modelBuilder.Entity<Contact>()
             .Property(e => e.ContactId)
             .IsRequired();
+
+        modelBuilder.Entity<Message>()
+            .HasOne(m => m.ReplyMessage)
+            .WithOne(rm => rm.Message)
+            .HasForeignKey<ReplyMessage>(rm => rm.MessageId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<Message>()
+            .HasOne(m => m.ForwardMessage)
+            .WithOne(fm => fm.Message)
+            .HasForeignKey<ForwardMessage>(fm => fm.MessageId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }
