@@ -2,6 +2,7 @@ using Chatly.Data;
 using Chatly.Exceptions;
 using Chatly.Interfaces.Repositories;
 using Chatly.Models;
+using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.EntityFrameworkCore;
 
 namespace Chatly.Repositories;
@@ -41,6 +42,17 @@ public class MessageRepository : IMessageRepository
         var sender = await _dbContext.Users.FirstOrDefaultAsync(x => x.Id == senderId);
         if (sender == null) throw new NotFoundException("Sender not found");
 
+
+        Console.WriteLine("------------------------");
+        Console.WriteLine("------------------------");
+        Console.WriteLine("------------------------");
+        Console.WriteLine("------------------------");
+        Console.WriteLine(contact.ContactId);
+        Console.WriteLine(contact.UserId);
+        Console.WriteLine(senderId);
+        Console.WriteLine("------------------------");
+        Console.WriteLine("------------------------");
+        Console.WriteLine("------------------------");
         if (!(contact.ContactId == senderId || contact.UserId == senderId))
         {
             throw new ApplicationUnauthorizedAccessException("You are not authorized to access this contact");
@@ -72,7 +84,9 @@ public class MessageRepository : IMessageRepository
             var previousContact =
                 await _dbContext.Contacts.FirstOrDefaultAsync(x => x.Id == messageToBeForwarded.ContactId);
             if (previousContact == null) throw new NotFoundException("Contact not found");
-            _ = previousContact.ContactId == senderId || previousContact.ContactId == contactId
+            Console.WriteLine(previousContact.ContactId);
+            Console.WriteLine(previousContact.UserId);
+            _ = previousContact.ContactId == senderId || previousContact.UserId == senderId
                 ? true
                 : throw new ApplicationUnauthorizedAccessException("Cannot forward message from unauthorized contact");
         }
@@ -121,5 +135,36 @@ public class MessageRepository : IMessageRepository
         await _dbContext.Messages.AddAsync(newMessage);
         await _dbContext.SaveChangesAsync();
         return (newMessage, newReplyMessage, newforwardMessage, contact);
+    }
+
+    public async Task<(List<Message>, int)> GetAllAsync(
+        string? contactId,
+        string? userId,
+        int page = 1,
+        int pageSize = 10
+    )
+    {
+        if (page < 1)
+        {
+            page = 1;
+        }
+
+        if (pageSize < 1)
+        {
+            pageSize = 10;
+        }
+
+        var contact = await _dbContext.Contacts.FirstOrDefaultAsync(x => x.Id == contactId);
+        if (contact == null) throw new NotFoundException("Contact not found");
+        if (contact.Status != ContactStatus.Accepted) throw new ConflictException("Contact is not accepted");
+        if (!(contact.ContactId == userId || contact.UserId == userId))
+            throw new ApplicationUnauthorizedAccessException("You are not authorized to access this contact");
+        var count = await _dbContext.Messages.Where(x => x.ContactId == contactId).CountAsync();
+        var queryable = _dbContext.Messages
+            .Include(x => x.ForwardMessage)
+            .Include(x => x.ReplyMessage)
+            .Where(c => c.ContactId == contactId).Skip((page - 1) * pageSize).Take(pageSize);
+        var replyMessages = await queryable.ToListAsync();
+        return (await queryable.ToListAsync(), count);
     }
 }

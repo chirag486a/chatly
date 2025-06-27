@@ -15,4 +15,6 @@ public class Message
 
     public User? Sender { get; set; }
     public Contact? Contact { get; set; }
+    public ReplyMessage? ReplyMessage { get; set; }
+    public ForwardMessage? ForwardMessage { get; set; }
 }

@@ -33,6 +33,7 @@ public class MessagesController : ControllerBase
         try
         {
             var currUser = User.GetUserId();
+            Console.WriteLine(User.GetUserName());
             if (currUser == null) throw new ApplicationUnauthorizedAccessException("You are not logged in");
             var (newMessage, newReplyMessage, newForwardMessage, contact) = await _repository.CreateAsync(
                 contactId: request.ContactId,
@@ -41,40 +42,15 @@ public class MessagesController : ControllerBase
                 replyMessageId: request.ReplyMessageId,
                 forwardMessageId: request.ForwardMessageId
             );
-            var response = new MessageResponseDto
-            {
-                Id = newMessage.Id,
-                ContactId = newMessage.ContactId,
-                Content = newMessage.Content
-            };
-            if (newReplyMessage != null)
-            {
-                response.ReplyMessage = new ReplyMessageResponseDto
-                {
-                    Id = newReplyMessage.Id,
-                    PreviousContent = newReplyMessage.PreviousContent,
-                    PreviousSenderId = newReplyMessage.PreviousSenderId,
-                };
-            }
-
-            if (newForwardMessage != null)
-            {
-                response.ForwardMessage = new ForwardMessageResponseDto
-                {
-                    Id = newForwardMessage.Id,
-                    PreviousContactId = newForwardMessage.PreviousContactId,
-                    PreviousSenderId = newForwardMessage.PreviousSenderId,
-                    SubContent = newForwardMessage.SubContent
-                };
-            }
+            var responseDto = newMessage.ToMessageResponseDto();
 
             var receiver = contact.UserId == currUser ? contact.ContactId : contact.UserId;
             if (receiver == null) throw new NotFoundException("Receiver does not exist");
             await _hub.Clients.User(receiver)
-                .SendAsync("ReceiveMessage", ApiResponse<MessageResponseDto>.SuccessResponse(response));
+                .SendAsync("ReceiveMessage", ApiResponse<MessageResponseDto>.SuccessResponse(responseDto));
             Console.WriteLine(receiver);
 
-            return CreatedAtAction(nameof(ReadMessage), ApiResponse<MessageResponseDto>.SuccessResponse(response,
+            return CreatedAtAction(nameof(ReadMessages), ApiResponse<MessageResponseDto>.SuccessResponse(responseDto,
                 "Message sent", null,
                 StatusCodes.Status201Created));
         }
@@ -101,8 +77,37 @@ public class MessagesController : ControllerBase
     }
 
     [HttpGet("[action]")]
-    public async Task<IActionResult> ReadMessage([FromQuery] string messageId)
+    [Authorize]
+    public async Task<IActionResult> ReadMessages([FromQuery] ReadMessageDto request)
     {
-        throw new NotImplementedException();
+        try
+        {
+            var userId = User.GetUserId();
+            if (userId == null) throw new ApplicationUnauthorizedAccessException("You are not logged in");
+
+
+            var (messages, count) =
+                await _repository.GetAllAsync(request.ContactId, userId, request.Page ?? 1, request.PageSize ?? 10);
+
+
+            return Ok(ApiResponse<List<MessageResponseDto>>.SuccessResponse(messages.ToListMessageResponseDto(),
+                "Messages", count, StatusCodes.Status200OK));
+        }
+        catch (ApplicationUnauthorizedAccessException e)
+        {
+            return Unauthorized(
+                ApiResponse<object>.ErrorResponse(e.Message, e.StatusCode, e.ErrorCode, e.Details, e.Errors));
+            throw;
+        }
+        catch (NotFoundException e)
+        {
+            return BadRequest(
+                ApiResponse<object>.ErrorResponse(e.Message, e.StatusCode, e.ErrorCode, e.Details, e.Errors));
+        }
+        catch (ConflictException e)
+        {
+            return Conflict(
+                ApiResponse<object>.ErrorResponse(e.Message, e.StatusCode, e.ErrorCode, e.Details, e.Errors));
+        }
     }
 }
