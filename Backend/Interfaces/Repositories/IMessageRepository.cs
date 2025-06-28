@@ -18,4 +18,10 @@ public interface IMessageRepository
         int page = 1,
         int pageSize = 10
     );
+
+    public Task<Message> EditMessageAsync(
+        string messageId,
+        string? senderId,
+        string? content
+    );
 }

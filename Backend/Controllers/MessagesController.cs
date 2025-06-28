@@ -110,4 +110,47 @@ public class MessagesController : ControllerBase
                 ApiResponse<object>.ErrorResponse(e.Message, e.StatusCode, e.ErrorCode, e.Details, e.Errors));
         }
     }
+
+    [HttpPatch("[action]")]
+    [Authorize]
+    public async Task<IActionResult> EditMessage([FromBody] EditMessageDto request)
+    {
+        try
+        {
+            var currUser = User.GetUserId();
+            if (currUser == null)
+            {
+                throw new ApplicationUnauthorizedAccessException("You are not logged in");
+            }
+
+            var newMessage = await _repository.EditMessageAsync(request.MessageId, currUser, request.NewContent);
+            //  Ensure that Contact is included in model!
+            var reciever = newMessage.Contact?.UserId == currUser
+                ? newMessage.Contact.ContactId
+                : newMessage.Contact?.UserId;
+
+            await _hub.Clients.User(reciever ?? currUser).SendAsync("MessageEdited",
+                ApiResponse<MessageResponseDto>.SuccessResponse(
+                    newMessage.ToMessageResponseDto(),
+                    "Message saved", null, StatusCodes.Status202Accepted
+                )
+            );
+            return Accepted(
+                ApiResponse<MessageResponseDto>.SuccessResponse(
+                    newMessage.ToMessageResponseDto(),
+                    "Message saved", null, StatusCodes.Status202Accepted
+                )
+            );
+        }
+        catch (ApplicationUnauthorizedAccessException e)
+        {
+            return Unauthorized(
+                ApiResponse<object>.ErrorResponse(e.Message, e.StatusCode, e.ErrorCode, e.Details, e.Errors));
+        }
+        catch (NotFoundException e)
+        {
+            return NotFound(
+                ApiResponse<object>.ErrorResponse(e.Message, e.StatusCode, e.ErrorCode, e.Details, e.Errors));
+        }
+    }
 }
