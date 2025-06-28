@@ -167,4 +167,43 @@ public class MessageRepository : IMessageRepository
         var replyMessages = await queryable.ToListAsync();
         return (await queryable.ToListAsync(), count);
     }
+
+    public async Task<Message> EditMessageAsync(
+        string messageId,
+        string? senderId,
+        string? content
+    )
+    {
+        var sender = await _dbContext.Users.FirstOrDefaultAsync(x => x.Id == senderId);
+        if (sender == null) throw new NotFoundException("Sender not found");
+
+        var message = await _dbContext.Messages
+            .Include(m => m.Contact)
+            .Include(m => m.ForwardMessage)
+            .FirstOrDefaultAsync(x => x.Id == messageId);
+        if (message == null) throw new NotFoundException("Message not found");
+
+        if (message.SenderId != senderId)
+        {
+            throw new ApplicationUnauthorizedAccessException("You are not authorized to edit this message");
+        }
+
+        if (message.IsReply || !message.IsForwarded)
+        {
+            message.Content = content ?? message.Content;
+            _dbContext.Messages.Update(message);
+        }
+
+        if (message.IsForwarded)
+        {
+            if (message.ForwardMessage == null)
+                throw new NotFoundException("IsForward is true but message not found");
+            message.ForwardMessage.SubContent = content ?? message.ForwardMessage.SubContent;
+            _dbContext.ForwardMessages.Update(message.ForwardMessage);
+        }
+
+        _dbContext.Messages.Update(message);
+        await _dbContext.SaveChangesAsync();
+        return message;
+    }
 }
