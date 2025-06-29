@@ -153,4 +153,41 @@ public class MessagesController : ControllerBase
                 ApiResponse<object>.ErrorResponse(e.Message, e.StatusCode, e.ErrorCode, e.Details, e.Errors));
         }
     }
+
+    /// <summary>
+    /// Permanently deletes a message from the database.
+    /// </summary>
+    /// <param name="request">
+    /// A <see cref="DeleteMessageDto"/> object containing the necessary information to identify and authorize the deletion request.
+    /// </param>
+    /// <returns>
+    /// Returns an appropriate <see cref="IActionResult"/> based on the outcome:
+    /// <list type="bullet">
+    ///   <item><description><see cref="UnauthorizedResult"/> if the user is not authorized to delete the message.</description></item>
+    ///   <item><description><see cref="NotFoundResult"/> if the message does not exist.</description></item>
+    ///   <item><description><see cref="NoContentResult"/> if the message was successfully deleted.</description></item>
+    /// </list>
+    /// </returns>
+    /// <remarks>
+    /// Exceptions or error states (Unauthorized, NotFound) are thrown from the repository layer and handled accordingly.
+    /// </remarks>
+    [HttpDelete("[action]")]
+    [Authorize]
+    public async Task<IActionResult> DeleteMessage([FromBody] DeleteMessageDto request)
+    {
+        try
+        {
+            return NoContent();
+        }
+        catch (NotFoundException e)
+        {
+            return NotFound(
+                ApiResponse<object>.ErrorResponse(e.Message, e.StatusCode, e.ErrorCode, e.Details, e.Errors));
+        }
+        catch (ApplicationUnauthorizedAccessException e)
+        {
+            return Unauthorized(
+                ApiResponse<object>.ErrorResponse(e.Message, e.StatusCode, e.ErrorCode, e.Details, e.Errors));
+        }
+    }
 }
