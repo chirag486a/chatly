@@ -16,7 +16,7 @@ public class MessageRepository : IMessageRepository
         _dbContext = dbContext;
     }
 
-    public async Task<(Message, ReplyMessage?, ForwardMessage?, Contact)> CreateAsync(string? contactId,
+    public async Task<Message> CreateAsync(string? contactId,
         string? senderId,
         string? content,
         string? replyMessageId = null,
@@ -134,7 +134,10 @@ public class MessageRepository : IMessageRepository
 
         await _dbContext.Messages.AddAsync(newMessage);
         await _dbContext.SaveChangesAsync();
-        return (newMessage, newReplyMessage, newforwardMessage, contact);
+        newMessage.ForwardMessage = newforwardMessage;
+        newMessage.ReplyMessage = newReplyMessage;
+        newMessage.Contact = contact;
+        return newMessage;
     }
 
     public async Task<(List<Message>, int)> GetAllAsync(

@@ -35,7 +35,7 @@ public class MessagesController : ControllerBase
             var currUser = User.GetUserId();
             Console.WriteLine(User.GetUserName());
             if (currUser == null) throw new ApplicationUnauthorizedAccessException("You are not logged in");
-            var (newMessage, newReplyMessage, newForwardMessage, contact) = await _repository.CreateAsync(
+            var newMessage = await _repository.CreateAsync(
                 contactId: request.ContactId,
                 senderId: currUser,
                 content: request.Content,
@@ -44,7 +44,9 @@ public class MessagesController : ControllerBase
             );
             var responseDto = newMessage.ToMessageResponseDto();
 
-            var receiver = contact.UserId == currUser ? contact.ContactId : contact.UserId;
+            var receiver = newMessage.Contact?.UserId == currUser
+                ? newMessage.Contact.ContactId
+                : newMessage.Contact?.UserId;
             if (receiver == null) throw new NotFoundException("Receiver does not exist");
             await _hub.Clients.User(receiver)
                 .SendAsync("ReceiveMessage", ApiResponse<MessageResponseDto>.SuccessResponse(responseDto));
