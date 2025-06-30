@@ -24,4 +24,6 @@ public interface IMessageRepository
         string? senderId,
         string? content
     );
+
+    public Task DeleteMessageAsync(string? messageId, string? userId);
 }
