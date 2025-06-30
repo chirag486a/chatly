@@ -179,6 +179,10 @@ public class MessagesController : ControllerBase
     {
         try
         {
+            var currUser = User.GetUserId();
+            if (currUser == null)
+                throw new ApplicationUnauthorizedAccessException("You are not logged in");
+            await _repository.DeleteMessageAsync(request.MessageId, currUser);
             return NoContent();
         }
         catch (NotFoundException e)

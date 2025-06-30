@@ -42,17 +42,6 @@ public class MessageRepository : IMessageRepository
         var sender = await _dbContext.Users.FirstOrDefaultAsync(x => x.Id == senderId);
         if (sender == null) throw new NotFoundException("Sender not found");
 
-
-        Console.WriteLine("------------------------");
-        Console.WriteLine("------------------------");
-        Console.WriteLine("------------------------");
-        Console.WriteLine("------------------------");
-        Console.WriteLine(contact.ContactId);
-        Console.WriteLine(contact.UserId);
-        Console.WriteLine(senderId);
-        Console.WriteLine("------------------------");
-        Console.WriteLine("------------------------");
-        Console.WriteLine("------------------------");
         if (!(contact.ContactId == senderId || contact.UserId == senderId))
         {
             throw new ApplicationUnauthorizedAccessException("You are not authorized to access this contact");
@@ -208,5 +197,21 @@ public class MessageRepository : IMessageRepository
         _dbContext.Messages.Update(message);
         await _dbContext.SaveChangesAsync();
         return message;
+    }
+
+    public async Task DeleteMessageAsync(string? messageId, string? userId)
+    {
+        if (userId == null)
+            throw new ApplicationUnauthorizedAccessException("Login to delete message");
+        if (messageId == null)
+            throw new ApplicationArgumentException("MessageId cannot be null", nameof(messageId));
+
+        var message = await _dbContext.Messages.FirstOrDefaultAsync(x => x.Id == messageId);
+        if (message == null) throw new NotFoundException("Message not found");
+        if (message.SenderId != userId)
+            throw new ApplicationUnauthorizedAccessException("You are not authorized to delete this message");
+
+        _dbContext.Messages.Remove(message);
+        await _dbContext.SaveChangesAsync();
     }
 }
