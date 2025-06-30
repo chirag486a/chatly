@@ -182,7 +182,12 @@ public class MessagesController : ControllerBase
             var currUser = User.GetUserId();
             if (currUser == null)
                 throw new ApplicationUnauthorizedAccessException("You are not logged in");
-            await _repository.DeleteMessageAsync(request.MessageId, currUser);
+
+            var message = await _repository.DeleteMessageAsync(request.MessageId, currUser);
+            var anotherUser = message.Contact?.UserId == currUser ? message.Contact.ContactId : message.Contact?.UserId;
+            await _hub.Clients.User(anotherUser ?? "").SendAsync("MessageDeleted",
+                ApiResponse<DeleteMessageDto>.SuccessResponse(request, "Message was deleted", null,
+                    StatusCodes.Status202Accepted));
             return NoContent();
         }
         catch (NotFoundException e)

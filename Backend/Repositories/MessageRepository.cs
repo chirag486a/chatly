@@ -199,19 +199,20 @@ public class MessageRepository : IMessageRepository
         return message;
     }
 
-    public async Task DeleteMessageAsync(string? messageId, string? userId)
+    public async Task<Message> DeleteMessageAsync(string? messageId, string? userId)
     {
         if (userId == null)
             throw new ApplicationUnauthorizedAccessException("Login to delete message");
         if (messageId == null)
             throw new ApplicationArgumentException("MessageId cannot be null", nameof(messageId));
 
-        var message = await _dbContext.Messages.FirstOrDefaultAsync(x => x.Id == messageId);
+        var message = await _dbContext.Messages.Include(m => m.Contact).FirstOrDefaultAsync(x => x.Id == messageId);
         if (message == null) throw new NotFoundException("Message not found");
         if (message.SenderId != userId)
             throw new ApplicationUnauthorizedAccessException("You are not authorized to delete this message");
 
         _dbContext.Messages.Remove(message);
         await _dbContext.SaveChangesAsync();
+        return message;
     }
 }
