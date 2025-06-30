@@ -4,7 +4,7 @@ namespace Chatly.Interfaces.Repositories;
 
 public interface IMessageRepository
 {
-    public Task<(Message, ReplyMessage?, ForwardMessage?, Contact)> CreateAsync(
+    public Task<Message> CreateAsync(
         string? contactId,
         string? senderId,
         string? content,
@@ -18,4 +18,12 @@ public interface IMessageRepository
         int page = 1,
         int pageSize = 10
     );
+
+    public Task<Message> EditMessageAsync(
+        string messageId,
+        string? senderId,
+        string? content
+    );
+
+    public Task<Message> DeleteMessageAsync(string? messageId, string? userId);
 }

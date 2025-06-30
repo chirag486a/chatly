@@ -16,7 +16,7 @@ public class MessageRepository : IMessageRepository
         _dbContext = dbContext;
     }
 
-    public async Task<(Message, ReplyMessage?, ForwardMessage?, Contact)> CreateAsync(string? contactId,
+    public async Task<Message> CreateAsync(string? contactId,
         string? senderId,
         string? content,
         string? replyMessageId = null,
@@ -42,17 +42,6 @@ public class MessageRepository : IMessageRepository
         var sender = await _dbContext.Users.FirstOrDefaultAsync(x => x.Id == senderId);
         if (sender == null) throw new NotFoundException("Sender not found");
 
-
-        Console.WriteLine("------------------------");
-        Console.WriteLine("------------------------");
-        Console.WriteLine("------------------------");
-        Console.WriteLine("------------------------");
-        Console.WriteLine(contact.ContactId);
-        Console.WriteLine(contact.UserId);
-        Console.WriteLine(senderId);
-        Console.WriteLine("------------------------");
-        Console.WriteLine("------------------------");
-        Console.WriteLine("------------------------");
         if (!(contact.ContactId == senderId || contact.UserId == senderId))
         {
             throw new ApplicationUnauthorizedAccessException("You are not authorized to access this contact");
@@ -134,7 +123,10 @@ public class MessageRepository : IMessageRepository
 
         await _dbContext.Messages.AddAsync(newMessage);
         await _dbContext.SaveChangesAsync();
-        return (newMessage, newReplyMessage, newforwardMessage, contact);
+        newMessage.ForwardMessage = newforwardMessage;
+        newMessage.ReplyMessage = newReplyMessage;
+        newMessage.Contact = contact;
+        return newMessage;
     }
 
     public async Task<(List<Message>, int)> GetAllAsync(
@@ -166,5 +158,61 @@ public class MessageRepository : IMessageRepository
             .Where(c => c.ContactId == contactId).Skip((page - 1) * pageSize).Take(pageSize);
         var replyMessages = await queryable.ToListAsync();
         return (await queryable.ToListAsync(), count);
+    }
+
+    public async Task<Message> EditMessageAsync(
+        string messageId,
+        string? senderId,
+        string? content
+    )
+    {
+        var sender = await _dbContext.Users.FirstOrDefaultAsync(x => x.Id == senderId);
+        if (sender == null) throw new NotFoundException("Sender not found");
+
+        var message = await _dbContext.Messages
+            .Include(m => m.Contact)
+            .Include(m => m.ForwardMessage)
+            .FirstOrDefaultAsync(x => x.Id == messageId);
+        if (message == null) throw new NotFoundException("Message not found");
+
+        if (message.SenderId != senderId)
+        {
+            throw new ApplicationUnauthorizedAccessException("You are not authorized to edit this message");
+        }
+
+        if (message.IsReply || !message.IsForwarded)
+        {
+            message.Content = content ?? message.Content;
+            _dbContext.Messages.Update(message);
+        }
+
+        if (message.IsForwarded)
+        {
+            if (message.ForwardMessage == null)
+                throw new NotFoundException("IsForward is true but message not found");
+            message.ForwardMessage.SubContent = content ?? message.ForwardMessage.SubContent;
+            _dbContext.ForwardMessages.Update(message.ForwardMessage);
+        }
+
+        _dbContext.Messages.Update(message);
+        await _dbContext.SaveChangesAsync();
+        return message;
+    }
+
+    public async Task<Message> DeleteMessageAsync(string? messageId, string? userId)
+    {
+        if (userId == null)
+            throw new ApplicationUnauthorizedAccessException("Login to delete message");
+        if (messageId == null)
+            throw new ApplicationArgumentException("MessageId cannot be null", nameof(messageId));
+
+        var message = await _dbContext.Messages.Include(m => m.Contact).FirstOrDefaultAsync(x => x.Id == messageId);
+        if (message == null) throw new NotFoundException("Message not found");
+        if (message.SenderId != userId)
+            throw new ApplicationUnauthorizedAccessException("You are not authorized to delete this message");
+
+        _dbContext.Messages.Remove(message);
+        await _dbContext.SaveChangesAsync();
+        return message;
     }
 }
