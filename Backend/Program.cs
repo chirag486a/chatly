@@ -105,6 +105,20 @@ builder.Services.AddCors(options =>
     });
 });
 
+var userProfilePathRelative = builder.Configuration["Storage:UserProfilePicturesPath"];
+Console.WriteLine($"userProfilePathRelative: {userProfilePathRelative}");
+if (string.IsNullOrEmpty(userProfilePathRelative))
+{
+    throw new Exception("UserProfilePath is missing or invalid.");
+}
+
+var userProfilePath = builder.Configuration["Storage:UserProfilePicturesPath"];
+if (string.IsNullOrEmpty(userProfilePath)) throw new Exception($"Profile Picture Path is missing.");
+
+if (!Directory.Exists(userProfilePath))
+{
+    Directory.CreateDirectory(userProfilePath);
+}
 
 var app = builder.Build();
 

@@ -1,17 +1,13 @@
-using System.Text.RegularExpressions;
-using Chatly.Data;
+using System.Net;
 using Chatly.DTO;
 using Chatly.DTO.Accounts;
 using Chatly.DTO.Users;
 using Chatly.Exceptions;
 using Chatly.Extensions;
 using Chatly.Interfaces.Repositories;
-using Chatly.Models;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
+using Chatly.Helper;
 
 namespace Chatly.Controllers;
 
@@ -50,6 +46,63 @@ public class UsersController : ControllerBase
             ));
         }
     }
+
+    [HttpGet("[action]")]
+    [Authorize]
+    public async Task<IActionResult> ProfilePicture()
+    {
+        try
+        {
+            var currUser = User.GetUserId();
+            if (currUser == null)
+            {
+                throw new ApplicationUnauthorizedAccessException("You are not logged in");
+            }
+
+            var (stream, mime) = await _userRepository.GetProfilePictureAsync(currUser);
+
+            return File(stream, mime);
+        }
+        catch (ApplicationUnauthorizedAccessException e)
+        {
+            return Unauthorized(ApiResponse<object>.ErrorResponse(e.Message, StatusCodes.Status401Unauthorized,
+                e.ErrorCode, e.Details, e.Errors));
+        }
+        catch (NotFoundException e)
+        {
+            return NotFound(
+                ApiResponse<object>.ErrorResponse(e.Message, e.StatusCode, e.ErrorCode, e.Details, e.Errors));
+        }
+    }
+
+    [HttpPatch("[action]")]
+    [Authorize]
+    public async Task<IActionResult> UpdateProfilePicture([FromForm] IFormFile? image)
+    {
+        try
+        {
+            var currUser = User.GetUserId();
+            if (currUser == null)
+            {
+                throw new ApplicationUnauthorizedAccessException("You are not logged in");
+            }
+
+            if (image == null || image.Length == 0)
+            {
+                throw new ApplicationArgumentException("Please provide an image", nameof(image));
+            }
+
+            await _userRepository.UpdateProfilePictureAsync(image, currUser);
+            return Accepted(ApiResponse<object>.SuccessResponse(null, "Profile Picture Updated", null,
+                StatusCodes.Status202Accepted));
+        }
+        catch (ApplicationUnauthorizedAccessException e)
+        {
+            return Unauthorized(ApiResponse<object>.ErrorResponse(e.Message, StatusCodes.Status401Unauthorized,
+                e.ErrorCode, e.Details, e.Errors));
+        }
+    }
+
 
     [HttpPatch("[action]")]
     [Authorize]

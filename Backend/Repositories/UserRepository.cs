@@ -14,11 +14,74 @@ public class UserRepository : IUserRepository
 {
     ApplicationDbContext _context;
     readonly UserManager<User> _userManager;
+    IConfiguration _configuration;
 
-    public UserRepository(ApplicationDbContext context, UserManager<User> userManager)
+    public UserRepository(ApplicationDbContext context, UserManager<User> userManager, IConfiguration configuration)
     {
         _context = context;
         _userManager = userManager;
+        _configuration = configuration;
+    }
+
+    public async Task<(Stream, string)> GetProfilePictureAsync(string? userId)
+    {
+        if (userId == null)
+            throw new ApplicationArgumentException("User id cannot be null", nameof(userId));
+
+        var user = await _userManager.FindByIdAsync(userId);
+        if (user == null) throw new ApplicationArgumentException("User does not exist", nameof(userId));
+
+        var folderPath = _configuration["Storage:UserProfilePicturesPath"];
+        if (folderPath == null)
+        {
+            throw new Exception("Unable to resolve User Profile Pictures Storage Path");
+        }
+
+
+        var file = Directory
+            .GetFiles(folderPath) // gets full paths
+            .FirstOrDefault(f => Path.GetFileNameWithoutExtension(f) == userId);
+
+        if (string.IsNullOrEmpty(file))
+        {
+            throw new NotFoundException("Profile picture not found",
+                $"Profile Picture doesnot exits in the server for user: {userId}");
+        }
+
+        var stream = new FileStream(file, FileMode.Open, FileAccess.Read);
+        return (stream, Helper.Helper.GetMimeType(file) ?? "application/octet-stream");
+    }
+
+    public async Task UpdateProfilePictureAsync(IFormFile? image, string? userId)
+    {
+        if (image == null) throw new ApplicationArgumentException("Image is null", nameof(image));
+        var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".bmp" };
+        var extension = Path.GetExtension(image.FileName);
+        if (!allowedExtensions.Contains(extension))
+        {
+            throw new ApplicationArgumentException(
+                $"Only ->  {string.Join(", ", allowedExtensions)} are allowed", nameof(image));
+        }
+
+        if (userId == null)
+            throw new ApplicationArgumentException("User id cannot be null", nameof(userId));
+
+        var user = await _userManager.FindByIdAsync(userId);
+        if (user == null) throw new ApplicationArgumentException("User does not exist", nameof(userId));
+
+
+        var profilePictureDirectory = _configuration["Storage:UserProfilePicturesPath"];
+        if (!Directory.Exists(profilePictureDirectory))
+        {
+            throw new ApplicationException("Profile picture path does not exist");
+        }
+
+        var imagePath = Path.Combine(profilePictureDirectory, user.Id) + extension;
+
+        using (var stream = new FileStream(imagePath, FileMode.Create))
+        {
+            await image.CopyToAsync(stream);
+        }
     }
 
     public async Task<SearchUsersResponseDto> SearchUsers(SearchUsersRequestDto request)
