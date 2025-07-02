@@ -1,7 +1,19 @@
 import { Link } from "react-router-dom";
 import InputField from "./Components/Input";
+import AuthContext from "../../Context/AuthContext";
+import { useContext, useEffect } from "react";
 
 export default function Login() {
+  const { login } = useContext(AuthContext);
+  useEffect(() => {
+    (async function () {
+      var response = await login({
+        Email: "chirag@gmail.com",
+        Password: "Admin@123",
+      });
+      console.log(response)
+    })();
+  });
   return (
     <div>
       <div className="mt-8 prose prose-h2:text-base-content prose-h2:mb-2 prose-h2:text-3xl prose-h2:font-semibold flex flex-col gap-2 prose-h2:text-center  w-full mx-auto items-center">
@@ -21,7 +33,6 @@ export default function Login() {
             <div className="prose prose-a:font-thin prose-a:no-underline prose-a:cursor-pointer prose-a:hover:underline prose-a:text-sm">
               <Link to="/signup">Don't have an account? Sign up</Link>
             </div>
-
           </div>
         </form>
       </div>
