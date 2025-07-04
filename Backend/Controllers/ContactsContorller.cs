@@ -27,7 +27,7 @@ public class ContactsController : ControllerBase
 
 
     [HttpPost]
-    public async Task<IActionResult> SendRequest(SendRequestRequestDto request)
+    public async Task<IActionResult> CreateContact([FromBody] CreateContactRequestDto request)
     {
         try
         {
@@ -35,61 +35,30 @@ public class ContactsController : ControllerBase
             var currUserName = User.GetUserName();
             if (currUserId == null || currUserName == null)
             {
-                throw new ApplicationUnauthorizedAccessException("User not logged in", "The user id is null").AddError(
-                    "UserId", "User id is null");
+                throw new ApplicationUnauthorizedAccessException("User not logged in", "The user id is null")
+                    .AddError(
+                        "UserId", "User id is null");
             }
 
-            var existingContact = await _contactRepository.GetAsync(userId: currUserId,
-                contactId: request.ContactUserId, contactUserName: request.ContactUserName);
-            if (existingContact == null)
-            {
-                existingContact =
-                    await _contactRepository.Create(
-                        userId: currUserId,
-                        currUserName: User.GetUserName(),
-                        contactUserId: request.ContactUserId,
-                        contacctUsername: request.ContactUserName
-                    );
-            }
 
-            if (existingContact.Status == ContactStatus.None)
-            {
-                existingContact =
-                    await _contactRepository.UpdateAsync(
-                        contactId: existingContact.Id,
-                        contactStatus: ContactStatus.Pending,
-                        userId: currUserId,
-                        contactUserId: request.ContactUserId
-                    );
-            }
+            var newContact = await _contactRepository.Create(
+                userId: currUserId,
+                currUserName: User.GetUserName(),
+                contactUserId: request.ContactUserId,
+                contacctUsername: request.ContactUserName
+            );
 
-            if (existingContact.Status == ContactStatus.Blocked)
-            {
-                throw new ConflictException("Can't send request", $"The contact status is {existingContact.Status}")
-                    .AddError("ContactStatus", $"The contact status is {existingContact.Status}");
-            }
-
-            if (existingContact.Status == ContactStatus.Pending)
-            {
-                var contactUserId = existingContact.ContactUser?.Id ?? request.ContactUserId ?? "abcdefghijl";
-
-                await _hubContext.Clients.User(contactUserId).SendAsync("ReceiveRequest",
-                    ApiResponse<SendRequestResponseDto>.SuccessResponse(
-                        new SendRequestResponseDto
-                        {
-                            Id = existingContact.Id,
-                            RequestStatus = existingContact.Status.ToString() ?? "ERR",
-                        },
-                        "Received a contact request"
-                    )
-                );
-            }
-
-            return CreatedAtAction(nameof(GetContact), new { contactId = existingContact.Id },
-                ApiResponse<SendRequestResponseDto>.SuccessResponse(new SendRequestResponseDto
+            return CreatedAtAction(nameof(GetContact), new { contactId = newContact.Id },
+                ApiResponse<ContactResponseDto>.SuccessResponse(new ContactResponseDto
                     {
-                        Id = existingContact.Id,
-                        RequestStatus = existingContact.Status.ToString() ?? "ERR",
+                        Id = newContact.Id,
+                        Status = newContact.Status.ToString() ?? "ERR",
+                        UserId = newContact.UserId,
+                        ContactId = newContact.ContactId,
+                        Archived = newContact.Archived,
+                        CreatedAt = newContact.CreatedAt,
+                        UnreadCount = newContact.UnreadCount,
+                        Mutated = newContact.Mutated
                     }, "Added contact", null,
                     StatusCodes.Status201Created));
         }
@@ -130,7 +99,8 @@ public class ContactsController : ControllerBase
     public async Task<IActionResult> GetContact([FromRoute] string contactId)
     {
         var c = await _contactRepository.GetAsync(contactId: contactId);
-        return Ok(ApiResponse<Contact?>.SuccessResponse(c, "Contact found", null, statusCode: StatusCodes.Status200OK));
+        return Ok(ApiResponse<Contact?>.SuccessResponse(c, "Contact found", null,
+            statusCode: StatusCodes.Status200OK));
     }
 
     [HttpGet]
@@ -227,7 +197,8 @@ public class ContactsController : ControllerBase
                 throw new ApplicationUnauthorizedAccessException("User not logged in", "The user id is null");
             }
 
-            var contact = await _contactRepository.UpdateAsync(request.ContactId, contactStatus: ContactStatus.Blocked);
+            var contact =
+                await _contactRepository.UpdateAsync(request.ContactId, contactStatus: ContactStatus.Blocked);
 
             return Accepted(ApiResponse<BlockResponseDto>.SuccessResponse(new BlockResponseDto
                 {

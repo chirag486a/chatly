@@ -90,8 +90,10 @@ public class ContactRepository : IContactRepository
             {
                 Id = Guid.NewGuid().ToString(),
                 ContactId = contactUser.Id,
+                ContactUser = contactUser,
                 UserId = currUser.Id,
-                Status = ContactStatus.Pending,
+                User = currUser,
+                Status = ContactStatus.None,
                 CreatedAt = DateTime.Now,
                 ChatDeleted = false,
                 Mutated = false,
