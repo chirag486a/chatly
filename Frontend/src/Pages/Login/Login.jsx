@@ -22,6 +22,7 @@ export default function Login() {
         Password: password,
       });
       // BUG
+      setEmailMessage("Hello")
       setEmail("");
       setPassword("");
       saveToken(response.data.token);
@@ -38,6 +39,7 @@ export default function Login() {
         setPassword("");
         return;
       }
+      setEmailMessage("Something went wrong");
       console.error(e);
     }
   }

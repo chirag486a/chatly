@@ -3,8 +3,11 @@ import axios from "axios";
 import ValidationError from "../Exceptions/ValidationError";
 import NetworkError from "../Exceptions/NetworkError";
 import BadRequest from "../Exceptions/BadRequest";
+import ArgumentError from "../Exceptions/ArgumentError";
+import AuthenticationError from "../Exceptions/AuthenticationError";
+import UserNotFound from "../Exceptions/UserNotFound";
 
-const API_ROUTE = `https://localhost:7174/api/accounts`;
+const API_ROUTE = `http://localhost:5280/api/accounts`;
 
 function isPlainObjectStrict(obj) {
   if (typeof obj !== "object" || obj === null) return false;
@@ -50,7 +53,7 @@ function AuthProvider({ children }) {
           "Content-Type": "application/json",
         },
       });
-      console.log(message)
+      console.log(message);
       return message.data;
     } catch (e) {
       if (e.code === "ERR_NETWORK") {
@@ -62,22 +65,60 @@ function AuthProvider({ children }) {
       throw e;
     }
   }
+  async function signup(formData = {}) {
+    try {
+      let message = await axios.post(`${API_ROUTE}/signup`, formData, {
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      return message.data;
+    } catch (e) {
+      console.error(e);
+      if (e.code === "ERR_NETWORK") {
+        throw new NetworkError(e.message, e);
+      }
+      if (e.code === "ERR_BAD_REQUEST") {
+        throw new BadRequest(e?.response?.data?.message, e?.response?.data);
+      }
+      throw e;
+    }
+  }
   function saveToken(token) {
+    if (!token) {
+      throw new ArgumentError("Invalid token");
+    }
     localStorage.setItem("token", token);
   }
   function getToken() {
-    return localStorage.getToken("token");
+    let token = localStorage.getToken("token");
+    if (!token) {
+      throw new AuthenticationError("Could not find the token");
+    }
+    return token;
   }
   function saveUser(user) {
     localStorage.setItem("user", JSON.stringify(user));
   }
   function getUser() {
-    localStorage.setItem("user");
+    try {
+      var stringUser = localStorage.setItem("user");
+      if (stringUser) {
+        throw new UserNotFound("User not found in the localstorage");
+      }
+      return JSON.parse(stringUser);
+    } catch (e) {
+      throw new UserNotFound(
+        "Couldn't parse the user from localstorage",
+        null,
+        e
+      );
+    }
   }
 
   return (
     <AuthContext.Provider
-      value={{ login, saveToken, getToken, saveUser, getUser }}
+      value={{ login, saveToken, getToken, saveUser, getUser, signup }}
     >
       {children}
     </AuthContext.Provider>
