@@ -1,4 +1,4 @@
-class BadRequest extends Error {
+class UserNotFound extends Error {
   constructor(message, data, { cause } = {}) {
     super(message); // sets the message on the base Error class
     this.name = "";
@@ -8,4 +8,4 @@ class BadRequest extends Error {
   }
 }
 
-export default BadRequest;
+export default UserNotFound;
