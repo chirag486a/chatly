@@ -10,6 +10,7 @@ let API_ROUTE = "http://localhost:5280/api";
 
 export default function APIProvider({ children }) {
   const [contacts, setContacts] = useState([]);
+  const [currentContact, setCurrentContact] = useState("");
   async function searchUsers(query = "", page = 1, pageSize = 5, token = "") {
     try {
       let route = `${API_ROUTE}/Users/Search`;
@@ -59,7 +60,7 @@ export default function APIProvider({ children }) {
   },
   []);
   return (
-    <APIContext.Provider value={{ searchUsers, loadContacts, contacts }}>
+    <APIContext.Provider value={{ searchUsers, loadContacts, contacts, currentContact, setCurrentContact }}>
       {children}
     </APIContext.Provider>
   );

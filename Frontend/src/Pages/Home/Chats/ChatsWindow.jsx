@@ -2,6 +2,8 @@ import MessageInputField from "./Components/MessageInputField";
 import NoChatSelection from "./Components/NoChatSelection";
 import ChatWindowTitle from "./Components/ChatWindowTitle";
 import ChatsWindowBody from "./Components/ChatsWindowBody";
+import { useContext } from "react";
+import APIContext from "../../../Context/APIContext";
 
 export default function ChatsWindow({ noChatSelection, noContacts }) {
   if (noContacts) {
