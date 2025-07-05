@@ -6,6 +6,7 @@ import BadRequest from "../Exceptions/BadRequest";
 import ArgumentError from "../Exceptions/ArgumentError";
 import AuthenticationError from "../Exceptions/AuthenticationError";
 import UserNotFound from "../Exceptions/UserNotFound";
+import { useCallback, useState } from "react";
 
 const API_ROUTE = `http://localhost:5280/api/accounts`;
 
@@ -53,7 +54,6 @@ function AuthProvider({ children }) {
           "Content-Type": "application/json",
         },
       });
-      console.log(message);
       return message.data;
     } catch (e) {
       if (e.code === "ERR_NETWORK") {
@@ -90,22 +90,23 @@ function AuthProvider({ children }) {
     }
     localStorage.setItem("token", token);
   }
-  function getToken() {
-    let token = localStorage.getToken("token");
+  const getToken = useCallback(function () {
+    let token = localStorage.getItem("token");
     if (!token) {
       throw new AuthenticationError("Could not find the token");
     }
     return token;
-  }
+  }, []);
   function saveUser(user) {
     localStorage.setItem("user", JSON.stringify(user));
   }
   function getUser() {
     try {
-      var stringUser = localStorage.setItem("user");
-      if (stringUser) {
+      var stringUser = localStorage.getItem("user");
+      if (!stringUser) {
         throw new UserNotFound("User not found in the localstorage");
       }
+
       return JSON.parse(stringUser);
     } catch (e) {
       throw new UserNotFound(
