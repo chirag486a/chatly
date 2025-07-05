@@ -1,3 +1,4 @@
+using Chatly.DTO.Accounts;
 using Chatly.Models;
 
 namespace Chatly.DTO.Contacts;
@@ -12,11 +13,15 @@ public class CreateContactRequestDto
     public string? ContactUserName { get; set; }
 }
 
-public class ContactResponseDto
+public class ContactDto
 {
     public string? Id { get; set; }
     public string? UserId { get; set; }
     public string? ContactId { get; set; }
+
+    public UserDto? User { get; set; }
+    public UserDto? ContactUser { get; set; }
+
     public string? Status { get; set; }
     public DateTime? CreatedAt { get; set; }
     public bool ChatDeleted { get; set; }

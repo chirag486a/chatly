@@ -6,20 +6,23 @@ import Home from "./Pages/Home/Home";
 import TopBar from "./Components/TopBar";
 import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
 import NotFound from "./Pages/NotFound";
+import AuthProvider from "./Providers/AuthProvider";
 
 function App() {
   return (
-    <div className="bg-base overflow-x-scroll">
-      <Router>
-        <TopBar />
-        <div className="divider m-0"></div>
-        <Routes>
-          <Route path="/signup" element={<Signup />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="*" element={<Home />} />
-        </Routes>
-      </Router>
-    </div>
+    <AuthProvider>
+      <div className="bg-base overflow-x-scroll h-dvh flex flex-col">
+        <Router>
+          {/* <TopBar showProfile={true} />
+          <div className="divider m-0"></div> */}
+          <Routes>
+            <Route path="/signup" element={<Signup />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="*" element={<Home />} />
+          </Routes>
+        </Router>
+      </div>
+    </AuthProvider>
   );
 }
 

@@ -16,13 +16,13 @@ public class LoginRequestDto
 
 public class UserDto
 {
-    public string Id { get; set; } = string.Empty;
-    public string UserName { get; set; } = string.Empty;
-    public string DisplayName { get; set; } = string.Empty;
-    public string Email { get; set; } = string.Empty;
-    public string Theme { get; set; } = string.Empty;
+    public string? Id { get; set; } = string.Empty;
+    public string? UserName { get; set; } = string.Empty;
+    public string? DisplayName { get; set; } = string.Empty;
+    public string? Email { get; set; } = string.Empty;
+    public string? Theme { get; set; } = string.Empty;
     public DateTime? LastSeen { get; set; }
-    public bool IsOnline { get; set; }
+    public bool? IsOnline { get; set; }
 }
 
 public class TokenResult
