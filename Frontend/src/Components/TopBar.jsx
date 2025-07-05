@@ -1,19 +1,17 @@
-import { Link, matchPath, useLocation } from "react-router-dom";
+import { Link } from "react-router-dom";
 import Logo from "../assets/logo.svg?react";
 import DefaultUserProfile from "../assets/default-user-profile.svg?react";
 import SettingsIcon from "../assets/settings-icon.svg?react";
 import LogoutIcon from "../assets/logout-icon.svg?react";
 import { useRef, useState } from "react";
 
-export default function TopBar() {
-  const location = useLocation();
+export default function TopBar({ showProfile }) {
   const profileBtnRef = useRef(null);
   const [contextMenu, setContextMenu] = useState({
     visible: false, // Should the menu be shown?
     x: 0, // X position on screen
     y: 0, // Y position on screen
   });
-  const isHome = matchPath({ path: "/" }, location.pathname);
   function handleContextMenu(e) {
     if (e.target.closest("#profile-btn") !== null) {
       setContextMenu({
@@ -32,7 +30,7 @@ export default function TopBar() {
         }
       }}
     >
-      <Link to="/" className="flex items-center justify-center">
+      <Link to="/chat" className="flex items-center justify-center">
         <div className="flex items-center gap-3">
           <Logo className="fill-base-content h-6" />
           <p className="text-2xl font-normal text-base-content">Chatly</p>
@@ -44,7 +42,7 @@ export default function TopBar() {
         onClick={(e) => handleContextMenu(e)}
         ref={profileBtnRef}
       >
-        <DefaultUserProfile className={isHome !== null ? "block" : "hidden"} />
+        <DefaultUserProfile className={showProfile ? "block" : "hidden"} />
         {contextMenu.visible && (
           <div
             className="absolute bg-neutral-200 right-1/2 rounded shadow-md z-50"

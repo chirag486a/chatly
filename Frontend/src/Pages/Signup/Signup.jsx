@@ -34,7 +34,7 @@ export default function Signup() {
       return;
     }
     try {
-      var response = await signup({
+      await signup({
         DisplayName: displayName,
         Email: email,
         Username: username,
@@ -80,6 +80,7 @@ export default function Signup() {
 
   return (
     <div>
+
       <div className="mt-4 prose prose-h2:text-base-content prose-h2:text-3xl prose-h2:font-semibold flex flex-col prose-h2:text-center  w-full mx-auto items-center">
         <h2>Sign up for Chatly</h2>
         <form

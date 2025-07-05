@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState } from "react";
+import { useContext, useState } from "react";
 import Search from "../../../assets/search.svg?react";
 import ChatWindow from "./ChatsWindow";
 import ContactLists from "./Components/ContactLists";
@@ -13,13 +13,9 @@ export default function ChatEnvironment() {
   const { searchUsers, currentContact, contacts } = useContext(APIContext);
   const { getToken } = useContext(AuthContext);
   const [searchMode, setSearchMode] = useState(false);
-  const [search, setSearch] = useState("");
+  const [_, setSearch] = useState("");
   console.log(currentContact);
   const { chatId } = useParams();
-
-  useEffect(() => {
-    console.log(chatId);
-  });
 
   async function handleSearch(e) {
     try {

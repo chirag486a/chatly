@@ -11,10 +11,10 @@ import AuthProvider from "./Providers/AuthProvider";
 function App() {
   return (
     <AuthProvider>
-      <div className="bg-base overflow-x-scroll">
+      <div className="bg-base overflow-x-scroll h-dvh flex flex-col">
         <Router>
-          <TopBar />
-          <div className="divider m-0"></div>
+          {/* <TopBar showProfile={true} />
+          <div className="divider m-0"></div> */}
           <Routes>
             <Route path="/signup" element={<Signup />} />
             <Route path="/login" element={<Login />} />
